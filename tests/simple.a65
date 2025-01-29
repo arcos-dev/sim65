@@ -1,0 +1,47 @@
+; ****************************************************************************
+; * Simple 6502 Assembly Example: Incrementing Value Storage                 *
+; * Description:                                                             *
+; *   This program continuously increments a value stored in                 *
+; *   memory address $0200. It demonstrates basic loops,                     *
+; *   register operations, and memory access.                                *
+; *                                                                          *
+; * Usage:                                                                   *
+; *   - Compile with 64tass                                                  *
+; *   - Load the binary into a 6502 emulator or hardware.                    *
+; *   - Monitor memory address $0200 to observe the incremented              *
+; *     value (e.g., using a memory dump tool).                              *
+; *                                                                          *
+; * Compilation:                                                             *
+; *   64tass -a -b -o simple.bin simple.a65                                  *
+; *                                                                          *
+; * Testing:                                                                 *
+; *   Use a debugger or memory viewer to inspect $0200.                      *
+; *   The value will cycle from $10 upward, wrapping on overflow.            *
+; ****************************************************************************
+
+        ; Define code origin (adjust for target system)
+        * = $8000
+
+; **************************** ***********************************************
+; * Program Entry Point      * * Comments                                    *
+; **************************** ***********************************************
+Start:
+        LDX #$00               ; Initialize counter (X = 0x00)
+Loop:
+        INX                    ; Increment X (X++)
+        STX $0200              ; Store X in memory location $0200
+        JMP Loop               ; Infinite loop (no exit condition)
+
+; ****************************
+; * Interrupt Vector Table   *
+; ****************************
+        * = $FFFA              ; Start of vector table
+
+        ; NMI vector (unused)
+        .word $0000            ; Placeholder for NMI handler
+
+        ; Reset vector
+        .word Start            ; Program starts at "Start" label
+
+        ; IRQ vector (unused)
+        .word $0000            ; Placeholder for IRQ handler
