@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "bus.h"
-#include "../cpu.h"
-#include "../clock.h"
-#include "../memory.h"
+#include "cpu.h"
+#include "clock.h"
+#include "memory.h"
 
 /**
  * @brief Structure to hold the result of a single test
@@ -385,20 +385,17 @@ static void test_cycles(bus_t *bus)
 
 int main(void)
 {
-    // Initialize the bus, memory, and clock
-    bus_t bus;
-
-    // Initialize the bus with a memory size and clock frequency disabled
-    if (bus_init(&bus, 64 * 1024, CPU_CLOCK_DISABLED) != 0)
+    // Barramento e CPU para testes funcionais
+    bus_t bus_func;
+    if (bus_init(&bus_func, 64 * 1024, CPU_CLOCK_DISABLED) != 0)
     {
-        fprintf(stderr, "Failed to initialize bus.\n");
+        fprintf(stderr, "Failed to initialize bus for functional tests.\n");
         return EXIT_FAILURE;
     }
-
-    if (cpu6502_init(&bus) != 0)
+    if (cpu6502_init(&bus_func) != 0)
     {
-        fprintf(stderr, "CPU initialization failed\n");
-        bus_destroy(&bus);
+        fprintf(stderr, "CPU initialization failed for functional tests.\n");
+        bus_destroy(&bus_func);
         return EXIT_FAILURE;
     }
 
@@ -412,36 +409,47 @@ int main(void)
     {
         fprintf(stderr, "Memory allocation failed\n");
         cpu6502_destroy();
-        bus_destroy(&bus);
+        bus_destroy(&bus_func);
         return EXIT_FAILURE;
     }
 
-    // Execute all tests
+    // Executa todos os testes funcionais
     for (size_t i = 0; i < test_count; i++)
     {
-        run_test(&bus, tests[i].filename, tests[i].expected_pc, tests[i].trace,
+        run_test(&bus_func, tests[i].filename, tests[i].expected_pc, tests[i].trace,
                  &results[i]);
         print_test_result(&results[i]);
     }
 
-    // Calculate and display summary
+    // Calcula e exibe o resumo
     size_t passed = 0;
-
     for (size_t i = 0; i < test_count; i++)
     {
         if (results[i].passed)
             passed++;
     }
-
     printf("\nSummary: %zu/%zu tests passed\n", passed, test_count);
     free(results);
 
-    // Perform cycle accuracy test
-    test_cycles(&bus);
-
-    // Clean up
     cpu6502_destroy();
-    bus_destroy(&bus);
+    cpu = NULL;
+    bus_destroy(&bus_func);
+
+    // Barramento e CPU para teste de ciclos
+    bus_t bus_cycle;
+    if (bus_init(&bus_cycle, 64 * 1024, CPU_CLOCK_DISABLED) != 0) {
+        fprintf(stderr, "Failed to initialize bus for cycle test\n");
+        return EXIT_FAILURE;
+    }
+    if (cpu6502_init(&bus_cycle) != 0) {
+        fprintf(stderr, "CPU initialization failed for cycle test\n");
+        bus_destroy(&bus_cycle);
+        return EXIT_FAILURE;
+    }
+    test_cycles(&bus_cycle);
+    cpu6502_destroy();
+    cpu = NULL;
+    bus_destroy(&bus_cycle);
 
     return EXIT_SUCCESS;
 }

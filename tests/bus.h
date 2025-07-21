@@ -3,8 +3,11 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
-#include "../clock.h"
-#include "../memory.h"
+#include "clock.h"
+#include "memory.h"
+#include "acia.h"
+#include "tia.h"
+#include "via.h"
 
 /* -----------------------------------------------------------------------------
  * Bus structure
@@ -16,6 +19,9 @@ typedef struct
     cpu_clock_t *clock; ///< Pointer to the clock
     memory_t memory;    ///< Memory structure
     bool clock_disabled;
+    Acia6550 *acia;     ///< Optional pointer to an ACIA device
+    TIA *tia;           ///< Optional pointer to a TIA device
+    VIA6522 *via;       ///< Optional pointer to a VIA 6522 device
 } bus_t;
 
 /* -----------------------------------------------------------------------------

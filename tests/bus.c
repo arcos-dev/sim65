@@ -1,7 +1,9 @@
 #include "bus.h"
-#include "../cpu.h"
-#include "../clock.h"
-#include "../memory.h"
+#include "cpu.h"
+#include "clock.h"
+#include "memory.h"
+#include <math.h>
+#include "via.h"
 
 /**
  * @brief Initialize the bus.
@@ -19,7 +21,7 @@ int bus_init(bus_t *bus, uint32_t memory_size, double clock_frequency)
     if (memory_init(&bus->memory, memory_size) != 0)
         return -1;
 
-    bus->clock_disabled = (clock_frequency == CPU_CLOCK_DISABLED);
+    bus->clock_disabled = (fabs(clock_frequency) < 1e-9);
 
     if (!bus->clock_disabled)
     {
@@ -31,8 +33,13 @@ int bus_init(bus_t *bus, uint32_t memory_size, double clock_frequency)
             memory_destroy(&bus->memory);
             return -1;
         }
+    } else {
+        bus->clock = NULL;
     }
-
+    // Inicializa periféricos como NULL
+    bus->acia = NULL;
+    bus->tia = NULL;
+    bus->via = NULL;
     return 0;
 }
 
@@ -42,15 +49,29 @@ int bus_init(bus_t *bus, uint32_t memory_size, double clock_frequency)
  */
 void bus_destroy(bus_t *bus)
 {
-    if (bus)
+    if (!bus)
+        return;
+    if (bus->acia)
     {
-        memory_destroy(&bus->memory);
-
-        if (bus->clock)
-        {
-            clock_destroy(bus->clock);
-            free(bus->clock);
-        }
+        acia_destroy(bus->acia);
+        bus->acia = NULL;
+    }
+    if (bus->tia)
+    {
+        tia_destroy(bus->tia);
+        bus->tia = NULL;
+    }
+    if (bus->via)
+    {
+        via_destroy(bus->via);
+        bus->via = NULL;
+    }
+    memory_destroy(&bus->memory);
+    if (bus->clock)
+    {
+        clock_destroy(bus->clock);
+        free(bus->clock);
+        bus->clock = NULL;
     }
 }
 
