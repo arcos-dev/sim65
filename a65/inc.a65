@@ -1,0 +1,6 @@
+    .org $8000    ; Endereço inicial da ROM PRG
+    LDA #$05      ; Carrega o valor imediato 5 no acumulador (A)
+    CLC           ; Limpa o flag de carry (opcional aqui)
+    ADC #$01      ; Soma 1 ao acumulador (A = A + 1)
+    STA $20       ; Armazena o valor de A no endereço $0020 (Zero Page)
+    BRK           ; Pausa o programa

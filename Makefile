@@ -69,7 +69,7 @@ $(shell mkdir -p $(BUILDDIR) $(BUILDDIR)/$(TESTDIR))
 
 # Main targets
 all: $(TARGET)
-	@echo "Done: Modern C build completed successfully with GCC $(shell $(CC) --version | head -n1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')"
+	@echo "Done: Build completed successfully with GCC $(shell $(CC) --version | head -n1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')"
 
 # Links the object files and generates the executable
 $(TARGET): $(OBJECTS)

@@ -1,0 +1,20 @@
+# Requisitos para o Emulador 6502 - Interface Gráfica
+# Versão: 3.1.0
+
+# Interface gráfica
+PyQt6>=6.4.0
+
+# Processamento de áudio
+numpy>=1.21.0
+scipy>=1.7.0
+
+# Processamento de imagem
+Pillow>=8.3.0
+
+# Utilitários
+pathlib2>=2.3.0
+
+# Desenvolvimento (opcional)
+pytest>=6.2.0
+black>=21.0.0
+flake8>=3.9.0 

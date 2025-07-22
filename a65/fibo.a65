@@ -1,0 +1,169 @@
+;==============================================================================
+; Fibonacci Sequence via Serial Port for 6502
+;==============================================================================
+;
+; Este programa calcula e envia os primeiros 10 números da
+; sequência de Fibonacci via porta serial no microprocessador 6502.
+;
+;==============================================================================
+; Como Compilar
+;==============================================================================
+;
+; Para compilar este código, você precisará do conjunto de ferramentas cc65.
+; Siga os passos abaixo:
+;
+; 1. Instale o cc65:
+;    No Linux, use o gerenciador de pacotes, por exemplo:
+;    $ sudo apt-get install cc65
+;
+;    No Windows, baixe o instalador do site oficial:
+;    http://www.cc65.org/
+;
+; 2. Salve este arquivo com uma extensão .s, por exemplo, fibo.s
+;
+; 3. Compile o código usando o ca65:
+;    $ ca65 fibo.a65 -o fibo.o
+;
+; 4. Monte o código objeto em um arquivo binário usando o ld65:
+;    $ ld65 fibo.o -C nrom.cfg -o fibo.bin
+;
+;    Observação: O arquivo nrom.cfg é um arquivo de configuração que define o
+;                layout da memória.
+;                Você pode criar um simples nrom.cfg com o seguinte conteúdo:
+;                ---------------------------------------------------
+;                MEMORY {
+;                    ZP:     start = $0000, size = $0100, type = rw;
+;                    CODE:   start = $C000, size = $3FFF, file = %O;
+;                }
+;                SEGMENTS {
+;                    ZEROPAGE: load = ZP, type = zp;
+;                    CODE:     load = CODE, type = ro;
+;                }
+;                ---------------------------------------------------
+;
+; 5. Use um emulador ou gravador para carregar fibo.bin no seu sistema 6502.
+;
+;==============================================================================
+; Autor: Anderson Costa
+; Data: 2025-01-30
+;==============================================================================
+
+        .org $C000             ; Endereço inicial do programa
+
+; Definindo endereços da porta serial (ajuste conforme seu hardware)
+SERIAL_PORT = $D012            ; Registro de dados
+SERIAL_STATUS = $D011          ; Registro de status
+TX_MASK = %00000001            ; Bit 0: buffer de transmissão vazio
+
+; Variáveis
+FIB_PREV: .byte $00
+FIB_CURR: .byte $00
+FIB_NEXT: .byte $00
+TENS: .byte $00
+UNITS: .byte $00
+
+; Início do programa
+START:
+        JSR INIT_SERIAL        ; Inicializa a porta serial
+
+        LDA #$00               ; Primeiro número (0)
+        STA FIB_PREV
+        JSR CONVERT_AND_SEND   ; Envia '0'
+
+        LDA #$01               ; Segundo número (1)
+        STA FIB_CURR
+        JSR CONVERT_AND_SEND   ; Envia '1'
+
+        LDX #$00               ; Inicializa contador de loop
+
+FIB_LOOP:
+        INX                    ; Incrementa contador
+        CPX #$08               ; 8 iterações restantes para 10 números
+        BEQ END
+
+        ; Calcula próximo número
+        LDA FIB_PREV
+        CLC
+        ADC FIB_CURR
+        STA FIB_NEXT
+
+        ; Atualiza valores anteriores
+        LDA FIB_CURR
+        STA FIB_PREV
+        LDA FIB_NEXT
+        STA FIB_CURR
+
+        ; Envia o número atual
+        JSR CONVERT_AND_SEND
+
+        JMP FIB_LOOP
+
+END:
+        JMP END
+
+;----------------------------------------------------------------------
+; Rotina: CONVERT_AND_SEND
+; Converte um número em A para ASCII e envia via serial
+;----------------------------------------------------------------------
+CONVERT_AND_SEND:
+        PHA                    ; Salva o número
+        LDA #$00
+        STA TENS               ; Zera dígito das dezenas
+        PLA                    ; Recupera o número
+
+        ; Calcula dezenas
+CONVERT_TENS:
+        CMP #10
+        BCC CONVERT_UNITS      ; <10? Vai para unidades
+        SBC #10                ; Subtrai 10
+        INC TENS               ; Incrementa dezenas
+        JMP CONVERT_TENS
+
+CONVERT_UNITS:
+        STA UNITS              ; Salva unidades
+        LDA TENS
+        BEQ SKIP_TENS          ; Se dezenas=0, não imprime
+
+        ; Envia dezenas
+        ORA #$30               ; Converte para ASCII
+        JSR SEND_CHAR
+
+SKIP_TENS:
+        ; Envia unidades
+        LDA UNITS
+        ORA #$30               ; Converte para ASCII
+        JSR SEND_CHAR
+
+        ; Envia espaço para separar números
+        LDA #' '
+        JSR SEND_CHAR
+        RTS
+
+;----------------------------------------------------------------------
+; Rotina: SEND_CHAR
+; Envia caractere em A via serial após verificar status
+;----------------------------------------------------------------------
+SEND_CHAR:
+        PHA                    ; Salva o caractere
+WAIT_TX:
+        LDA SERIAL_STATUS
+        AND #TX_MASK
+        BEQ WAIT_TX            ; Espera buffer vazio
+        PLA                    ; Recupera o caractere
+        STA SERIAL_PORT        ; Envia
+        RTS
+
+;----------------------------------------------------------------------
+; Rotina: INIT_SERIAL
+; Inicializa a porta serial (exemplo para ACIA 6551)
+;----------------------------------------------------------------------
+INIT_SERIAL:
+        ; Ajuste conforme necessário para seu hardware
+        LDA #%00001011         ; Sem paridade, sem eco, sem interrupções
+        STA $D010              ; Registro de controle
+        LDA #%00011110         ; 8 bits, 1 stop bit, 19200 baud
+        STA $D010              ; Registro de comando
+        RTS
+
+        .org $FFFC             ; Vetor de reset
+        .word START

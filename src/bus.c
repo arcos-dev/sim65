@@ -4,7 +4,10 @@
  * Bus (CPU + Memory + Clock + I/O) Emulation Module with ACIA and TIA Support
  *
  * This source file implements the Bus structure and functions required to
- * emulate a simple 6502-like memory bus with integrated clock and optional
+ * emula    {
+        fprintf(stderr, "Failed to read the entire file '%s'.\n", filename);
+        return -1;
+    }e 6502-like memory bus with integrated clock and optional
  * attached devices (ACIA 6550/6551 and TIA). It provides functions for
  * initialization, destruction, resetting, reading, and writing data.
  *
@@ -77,13 +80,11 @@ int bus_init(bus_t *bus, uint32_t memory_size, double clock_frequency,
  */
 void bus_destroy(bus_t *bus)
 {
-    printf("[DEBUG] bus_destroy chamado\n");
     if (bus)
     {
         // Destroy ACIA
         if (bus->acia)
         {
-            printf("[DEBUG] Liberando ACIA\n");
             acia_destroy(bus->acia);
             bus->acia = NULL;
         }
@@ -91,25 +92,21 @@ void bus_destroy(bus_t *bus)
         // Destroy TIA
         if (bus->tia)
         {
-            printf("[DEBUG] Liberando TIA\n");
             tia_destroy(bus->tia);
             bus->tia = NULL;
         }
         // Destroy VIA
         if (bus->via)
         {
-            printf("[DEBUG] Liberando VIA\n");
             via_destroy(bus->via);
             bus->via = NULL;
         }
         // Destroy memory
-        printf("[DEBUG] Liberando memória\n");
         memory_destroy(&bus->memory);
 
         // Destroy clock
         if (bus->clock)
         {
-            printf("[DEBUG] Liberando clock\n");
             clock_destroy(bus->clock);
             free(bus->clock);
             bus->clock = NULL;
@@ -272,12 +269,6 @@ int bus_load_program(bus_t *bus, const char *filename, uint16_t start_address)
         fprintf(stderr, "Failed to read the entire file '%s'.\n", filename);
         return -1;
     }
-
-    // Log debug info
-    printf("Loading file '%s' at address 0x%04X\n", filename, start_address);
-    printf("ROM size: %zu bytes\n", read_size);
-    printf("Copied ROM data to memory from 0x%04X to 0x%04lX\n", start_address,
-           (unsigned long) (start_address + read_size - 1));
 
     return 0;
 }

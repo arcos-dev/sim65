@@ -1,0 +1,97 @@
+; ==============================================================================
+; LOVELACE NOTE G ALGORITHM - 6502 EDITION
+; Inspired by Ada Lovelace's Sketch of The Analytical Engine by Charles Babbage
+; Calculates: sum = 1 + 2 + 3 + ... + n (8-bit unsigned)
+; CC65 Compiler Target: Commodore 64 / Atari 8-bit / Apple II Architecture
+; ==============================================================================
+
+; Compilation Instructions using cc65:
+; 1. Assemble the source code:
+;    c
+; 2. Link the object file to the desired target:
+;    ld65 noteg.o -t <target> -o noteg.<ext>
+;    Where <target> can be:
+;      - c64     : Commodore 64
+;      - atari   : Atari 8-bit
+;      - apple2  : Apple II
+;    And <ext> is typically .prg for C64/Atari or .bin for Apple II
+;
+; Examples:
+;    For Commodore 64:
+;      ld65 noteg.o -t c64 -o noteg.prg
+;
+;    For Atari 8-bit:
+;      ld65 noteg.o -t atari -o noteg.prg
+;
+;    For Apple II:
+;      ld65 noteg.o -t apple2 -o noteg.bin
+; ==============================================================================
+
+    .cpu 6502
+    .org $0801                 ; Typical start address for BASIC programs on C64
+
+; ------------------------------------------------------------------------------
+; MEMORY SEGMENTS
+; ------------------------------------------------------------------------------
+    .segment "ZEROPAGE"
+term_counter:   .res 1         ; [Variable V1] Number of terms (n)
+current_term:   .res 1         ; [Variable V2] Active term in sequence
+series_total:   .res 1         ; [Variable V3] Cumulative sum (result)
+
+    .segment "CODE"
+
+; ------------------------------------------------------------------------------
+; MAIN PROCESSING UNIT
+; ------------------------------------------------------------------------------
+    .proc arithmetic_series
+        ; == PHASE 1 - INITIALIZATION ==========================================
+        lda #5                 ; [Operation O1] Set noteg length (n=5)
+        sta term_counter       ; Store in Variable V1
+
+        lda #0                 ; [Operation O2] Initialize sum register
+        sta series_total       ; Store in Variable V3
+
+        lda #1                 ; [Operation O3] Prime first term of sequence
+        sta current_term       ; Store in Variable V2
+
+        ; == PHASE 2 - ITERATIVE COMPUTATION ===================================
+compute_loop:
+        clc                    ; [Operation O4] Clear carry for clean addition
+        lda series_total       ; Load current sum (V3)
+        adc current_term       ; Add current term (V2) -> A = V3 + V2
+        sta series_total       ; Update sum register (V3)
+
+        ; == PHASE 3 - SEQUENCE PROGRESSION ====================================
+        inc current_term       ; [Operation O5] Advance to next natural number
+
+        ; == PHASE 4 - FLOW CONTROL ============================================
+        dec term_counter       ; [Operation O6] Decrement iteration counter
+        bne compute_loop       ; [Operation O7] Continue until V1 reaches zero
+
+        ; == PHASE 5 - RESULT FINALIZATION =====================================
+        lda series_total       ; [Operation O8] Transfer sum to accumulator
+        sta result_buffer      ; Store in dedicated result memory
+
+        rts                    ; Return from computation process
+    .endproc
+
+; ------------------------------------------------------------------------------
+; SYSTEM INTERFACE SECTION
+; ------------------------------------------------------------------------------
+    .proc main
+        jsr arithmetic_series  ; Execute series computation
+        rts                    ; Return to system
+    .endproc
+
+; ==============================================================================
+; DATA RESERVATION ZONES
+; ==============================================================================
+    .segment "RODATA"
+    ; (Future expansion for constant data)
+
+    .segment "BSS"
+result_buffer:  .res 1         ; Dedicated result storage
+
+; ==============================================================================
+; END OF PROGRAM
+; ==============================================================================

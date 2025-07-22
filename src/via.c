@@ -79,8 +79,6 @@ void via_tick_serial(VIA6522 *via) {
         via->shift_active = false;
         via->sr_tx_ready = true;
         via->ifr |= 0x10; // IFR bit 4: SR interrupt
-        // Exibe byte transmitido
-        putchar(via->shift_reg); // Para debug/monitor
     }
 }
 
@@ -181,4 +179,4 @@ void via_write(VIA6522 *via, uint16_t address, uint8_t value) {
             via->reg[reg] = value;
             break;
     }
-} 
+}

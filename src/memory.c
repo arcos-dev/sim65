@@ -29,7 +29,6 @@ int memory_init(memory_t *memory, uint32_t size)
  */
 void memory_destroy(memory_t *memory)
 {
-    printf("[DEBUG] memory_destroy chamado\n");
     if (memory && memory->data)
     {
         free(memory->data);

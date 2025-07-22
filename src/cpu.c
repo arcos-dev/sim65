@@ -1601,7 +1601,6 @@ int cpu6502_step(void)
  */
 void cpu6502_destroy(void)
 {
-    printf("[DEBUG] cpu6502_destroy chamado\n");
     opcode_table_destroy();
     free(cpu);
     cpu = NULL;
