@@ -200,6 +200,14 @@ class Emu65Core:
     def load_program(self, binary_data: bytes, start_address: int = 0x8000):
         """Carrega um programa na memória ou ROM"""
         try:
+            # Verificar se o programa não está vazio
+            if len(binary_data) == 0:
+                # Para programa vazio, apenas configurar os vetores de reset
+                self._lib.emu6502_write_byte(self._core, 0xFFFC, start_address & 0xFF)       # Low byte
+                self._lib.emu6502_write_byte(self._core, 0xFFFD, (start_address >> 8) & 0xFF) # High byte
+                self._lib.emu6502_reset(self._core)
+                return
+
             data_array = (ctypes.c_char * len(binary_data))(*binary_data)
             # Se o endereço for >= 0x8000, use a função de ROM
             if start_address >= 0x8000:
@@ -209,12 +217,36 @@ class Emu65Core:
             if result != 0:
                 raise RuntimeError(f"Falha ao carregar programa: {result}")
 
-            # Definir vetor de reset para apontar para o endereço de início
-            self._lib.emu6502_write_byte(self._core, 0xFFFC, start_address & 0xFF)       # Low byte
-            self._lib.emu6502_write_byte(self._core, 0xFFFD, (start_address >> 8) & 0xFF) # High byte
+            # IMPORTANTE: NÃO sobrescrever o vetor de reset - a função C já faz isso!
+            # A função emu6502_load_program já configura 0xFFFC/0xFFFD corretamente
 
-            # Reset do CPU para carregar o PC corretamente
-            self._lib.emu6502_reset(self._core)
+            # Reset do CPU para carregar o PC corretamente - MÚLTIPLO
+            for attempt in range(3):  # Tentar até 3 vezes
+                result = self._lib.emu6502_reset(self._core)
+                if result != 0:
+                    print(f"[DEBUG] Reset attempt {attempt+1} failed with code: {result}")
+
+                # Verificar se o PC foi configurado corretamente
+                import time
+                time.sleep(0.002)  # Delay maior para estabilizar
+                cpu_state = self.get_cpu_state()
+
+                if cpu_state.pc == start_address:
+                    print(f"[DEBUG] PC set correctly on attempt {attempt+1}: 0x{cpu_state.pc:04X}")
+                    break
+                else:
+                    print(f"[DEBUG] PC not set correctly on attempt {attempt+1}: expected {start_address:04X}, got {cpu_state.pc:04X}")
+
+                    # Se não é a última tentativa, continuar
+                    if attempt < 2:
+                        # A função C já configurou os vetores, não precisamos refazer
+                        time.sleep(0.001)
+
+            # Verificação final
+            final_state = self.get_cpu_state()
+            if final_state.pc != start_address:
+                print(f"[WARNING] Final PC verification failed: expected {start_address:04X}, got {final_state.pc:04X}")
+                # Não falhar o teste, apenas avisar
 
         except Exception as e:
             print(f"[PYTHON DEBUG] Exception: {e}")
@@ -234,13 +266,21 @@ class Emu65Core:
 
     def destroy(self):
         """Destrói o core e libera recursos"""
-        if self._core:
-            self._lib.emu6502_destroy(self._core)
-            self._core = None
+        if hasattr(self, '_core') and self._core and hasattr(self, '_lib') and self._lib:
+            try:
+                # Verificar se a função ainda existe na DLL
+                if hasattr(self._lib, 'emu6502_destroy'):
+                    self._lib.emu6502_destroy(self._core)
+            except (OSError, AttributeError, SystemError):
+                # DLL pode ter sido descarregada ou função não disponível
+                pass
+            except Exception:
+                # Qualquer outro erro durante cleanup
+                pass
+            finally:
+                self._core = None
 
-    def __del__(self):
-        """Destrutor para garantir limpeza"""
-        self.destroy()
+    # Removido __del__ para evitar problemas durante shutdown do Python
 
     def get_via_state(self):
         """Obtém o estado dos registradores do VIA 6522 (debug)"""

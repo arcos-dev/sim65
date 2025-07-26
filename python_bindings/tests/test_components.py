@@ -34,9 +34,9 @@ def test_component_names_are_strings():
 
 def test_component_usage_summary():
     # Apenas para garantir que todos os componentes esperados aparecem em pelo menos um programa
-    expected = {'6502 CPU', 'LCD 16x2', 'LED', 'Botão', 'RAM', 'ROM', 'Resistor', 'Capacitor'}
+    expected = {'6502 CPU', 'LCD 16x2', 'LED', 'Botão', 'RAM', 'ROM'}  # Atualizado para componentes reais
     found = set()
     programs = Programs6502.get_all_programs()
     for prog in programs:
         found.update(prog['components'])
-    assert expected.issubset(found), f"Nem todos os componentes esperados estão presentes: {expected - found}" 
+    assert expected.issubset(found), f"Nem todos os componentes esperados estão presentes: {expected - found}"

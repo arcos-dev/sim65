@@ -53,7 +53,7 @@ class LogPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(16)
-        
+
         # Título
         title_label = QLabel("Log de Eventos")
         title_label.setProperty("class", "green-label-large")
@@ -61,14 +61,14 @@ class LogPanel(QWidget):
         title_label.setFont(QFont("Segoe UI Variable", 14, QFont.Weight.Bold))
         title_label.setMinimumHeight(40)
         layout.addWidget(title_label)
-        
+
         # Área de log
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setFont(QFont("Consolas", 12))
         self.log_text.setProperty("class", "log-area")
         layout.addWidget(self.log_text, 1)
-        
+
         # Botões
         btns = QHBoxLayout()
         btns.setSpacing(12)
@@ -83,7 +83,7 @@ class LogPanel(QWidget):
 
 class Emu65MainWindow(QMainWindow):
     """Janela principal do emulador 6502"""
-    
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("EMU65 - Emulador 6502")
@@ -100,7 +100,7 @@ class Emu65MainWindow(QMainWindow):
         self.status_panel = StatusPanel()
         self.memory_panel = MemoryPanel()
         self.log_panel = LogPanel()
-        
+
         # Widget LCD para referência
         self.lcd_widget = None
 
@@ -113,17 +113,17 @@ class Emu65MainWindow(QMainWindow):
         # Timers
         self.clock_timer = QTimer()
         self.clock_timer.timeout.connect(self.clock_tick)
-        
+
         # Interface
         self.init_ui()
         self.create_menu_bar()
-        
+
         # Conectar sinais
         self.connect_signals()
-        
+
         # Log inicial
         self.status_panel.add_log_entry("EMU65 iniciado")
-    
+
     def init_core(self):
         """Inicializa o core do emulador"""
         try:
@@ -135,39 +135,39 @@ class Emu65MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Falha ao inicializar o core: {e}")
             sys.exit(1)
-    
+
     def create_white_icon(self, standard_pixmap):
         """Cria um ícone branco a partir de um ícone padrão do sistema"""
         style = self.style()
         if not style:
             return QIcon()
-        
+
         # Obtém o ícone padrão
         original_icon = style.standardIcon(standard_pixmap)
         if original_icon.isNull():
             return QIcon()
-        
+
         # Obtém o pixmap do ícone
         pixmap = original_icon.pixmap(24, 24)
         if pixmap.isNull():
             return QIcon()
-        
+
         # Cria um novo pixmap com fundo transparente
         white_pixmap = QPixmap(pixmap.size())
         white_pixmap.fill(QColor(0, 0, 0, 0))  # Fundo transparente
-        
+
         # Desenha o ícone em branco
         painter = QPainter(white_pixmap)
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
-        
+
         # Aplica uma máscara para tornar o ícone branco
         painter.setPen(QColor(255, 255, 255))  # Branco
         painter.setBrush(QColor(255, 255, 255))  # Branco
-        
+
         # Desenha o ícone original como máscara
         painter.drawPixmap(0, 0, pixmap)
         painter.end()
-        
+
         return QIcon(white_pixmap)
 
     def init_ui(self):
@@ -177,7 +177,7 @@ class Emu65MainWindow(QMainWindow):
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
         toolbar.setMovable(False)
         toolbar.setProperty("class", "main-toolbar")
-        
+
         # Botão carregar binário
         btn_load = QPushButton("Carregar Binário")
         btn_load.setProperty("class", "toolbar-button")
@@ -185,9 +185,9 @@ class Emu65MainWindow(QMainWindow):
         btn_load.setFont(QFont("Segoe UI Variable", 10, QFont.Weight.Bold))
         btn_load.clicked.connect(self.load_rom)
         toolbar.addWidget(btn_load)
-        
+
         toolbar.addSeparator()
-        
+
         # Botão carregar exemplo
         btn_example = QPushButton("Carregar Exemplo")
         btn_example.setProperty("class", "toolbar-button")
@@ -195,37 +195,47 @@ class Emu65MainWindow(QMainWindow):
         btn_example.setFont(QFont("Segoe UI Variable", 10, QFont.Weight.Bold))
         btn_example.clicked.connect(self.load_example)
         toolbar.addWidget(btn_example)
-        
+
         toolbar.addSeparator()
-        
+
+        # Botão de teste LCD
+        btn_test_lcd = QPushButton("Teste LCD")
+        btn_test_lcd.setProperty("class", "toolbar-button")
+        btn_test_lcd.setMinimumHeight(35)
+        btn_test_lcd.setFont(QFont("Segoe UI Variable", 10, QFont.Weight.Bold))
+        btn_test_lcd.clicked.connect(self.test_lcd_direct)
+        toolbar.addWidget(btn_test_lcd)
+
+        toolbar.addSeparator()
+
         # ComboBox de componentes
         component_label = QLabel("Adicionar componente:")
         component_label.setProperty("class", "toolbar-label")
         component_label.setFont(QFont("Segoe UI Variable", 10, QFont.Weight.Bold))
         toolbar.addWidget(component_label)
-        
+
         self.component_combo = QComboBox()
         self.component_combo.setProperty("class", "toolbar-combo")
         self.component_combo.setMinimumHeight(35)
         self.component_combo.setMinimumWidth(150)
         self.component_combo.addItems(["6502 CPU", "RAM", "ROM", "LCD 16x2", "Botão", "LED", "Resistor", "Capacitor"])
         toolbar.addWidget(self.component_combo)
-        
+
         btn_add = QPushButton("Adicionar")
         btn_add.setProperty("class", "toolbar-button")
         btn_add.setMinimumHeight(35)
         btn_add.setFont(QFont("Segoe UI Variable", 10, QFont.Weight.Bold))
         btn_add.clicked.connect(self.on_add_component)
         toolbar.addWidget(btn_add)
-        
+
         toolbar.addSeparator()
-        
+
         # Controles do grid
         grid_label = QLabel("Grid:")
         grid_label.setProperty("class", "toolbar-label")
         grid_label.setFont(QFont("Segoe UI Variable", 10, QFont.Weight.Bold))
         toolbar.addWidget(grid_label)
-        
+
         # Botão para alternar grid
         self.grid_toggle_button = QPushButton("Grid")
         self.grid_toggle_button.setProperty("class", "toolbar-button")
@@ -235,7 +245,7 @@ class Emu65MainWindow(QMainWindow):
         self.grid_toggle_button.setChecked(True)
         self.grid_toggle_button.clicked.connect(self.toggle_grid)
         toolbar.addWidget(self.grid_toggle_button)
-        
+
         # Botão para alternar snap-to-grid
         self.snap_toggle_button = QPushButton("Snap")
         self.snap_toggle_button.setProperty("class", "toolbar-button")
@@ -245,7 +255,7 @@ class Emu65MainWindow(QMainWindow):
         self.snap_toggle_button.setChecked(True)
         self.snap_toggle_button.clicked.connect(self.toggle_snap_to_grid)
         toolbar.addWidget(self.snap_toggle_button)
-        
+
         # SpinBox para tamanho do grid
         self.grid_size_spin = QSpinBox()
         self.grid_size_spin.setProperty("class", "toolbar-combo")
@@ -257,7 +267,7 @@ class Emu65MainWindow(QMainWindow):
         self.grid_size_spin.setMaximumWidth(100)
         self.grid_size_spin.valueChanged.connect(self.set_grid_size)
         toolbar.addWidget(self.grid_size_spin)
-        
+
         toolbar.addSeparator()
 
         # Widget central
@@ -276,7 +286,7 @@ class Emu65MainWindow(QMainWindow):
         self.work_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         splitter.addWidget(self.work_area)
         splitter.setStretchFactor(0, 3)  # Central: mais espaço
-        
+
         # Conectar sinais do work area (após criar o work_area)
         self.work_area.component_moved.connect(self.on_component_moved)
         self.work_area.component_rotated.connect(self.on_component_rotated)
@@ -285,20 +295,20 @@ class Emu65MainWindow(QMainWindow):
         self.side_tabs = QTabWidget()
         self.side_tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.side_tabs.setMinimumWidth(200)  # Reduzido de ~300 para 200 pixels
-        
+
         # Configurar políticas de tamanho para todos os painéis
         for panel in [self.control_panel, self.status_panel, self.memory_panel, self.log_panel]:
             panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        
+
         self.side_tabs.addTab(self.control_panel, "Controle")
         self.side_tabs.addTab(self.status_panel, "Status")
         self.side_tabs.addTab(self.memory_panel, "Memória")
         self.side_tabs.addTab(self.log_panel, "Log")
-        
+
         # Adicionar ao splitter principal
         splitter.addWidget(self.side_tabs)
         splitter.setStretchFactor(1, 1)  # Lateral: menos espaço
-        
+
         # Definir tamanhos padrão
         splitter.setSizes([int(self.width()*0.7), int(self.width()*0.3)])
 
@@ -307,7 +317,7 @@ class Emu65MainWindow(QMainWindow):
         bottom_bar.setSpacing(8)  # Espaçamento entre botões reduzido
         bottom_bar.setContentsMargins(12, 4, 12, 4)  # Margens da barra mais compactas
         bottom_bar.addStretch()
-        
+
         # Botões com tamanho e estilo padronizados
         self.btn_play = QToolButton()
         self.btn_play.setProperty("class", "toolbar-button")
@@ -320,7 +330,7 @@ class Emu65MainWindow(QMainWindow):
         self.btn_play.clicked.connect(self.on_run)
         self.btn_play.setToolTip("Executar")
         bottom_bar.addWidget(self.btn_play)
-        
+
         self.btn_pause = QToolButton()
         self.btn_pause.setProperty("class", "toolbar-button")
         self.btn_pause.setMinimumSize(44, 44)
@@ -331,7 +341,7 @@ class Emu65MainWindow(QMainWindow):
         self.btn_pause.clicked.connect(self.on_stop)
         self.btn_pause.setToolTip("Pausar")
         bottom_bar.addWidget(self.btn_pause)
-        
+
         self.btn_stop = QToolButton()
         self.btn_stop.setProperty("class", "toolbar-button")
         self.btn_stop.setMinimumSize(44, 44)
@@ -342,7 +352,7 @@ class Emu65MainWindow(QMainWindow):
         self.btn_stop.clicked.connect(self.on_stop)
         self.btn_stop.setToolTip("Parar")
         bottom_bar.addWidget(self.btn_stop)
-        
+
         self.btn_reset = QToolButton()
         self.btn_reset.setObjectName("reset-button")
         self.btn_reset.setProperty("class", "toolbar-button")
@@ -354,14 +364,14 @@ class Emu65MainWindow(QMainWindow):
         self.btn_reset.clicked.connect(self.on_reset)
         self.btn_reset.setToolTip("Resetar")
         bottom_bar.addWidget(self.btn_reset)
-        
+
         bottom_bar.addStretch()
         main_layout.addLayout(bottom_bar)
 
         # Barra de status
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-        
+
         # Inicializar status do grid
         self.update_grid_status()
 
@@ -377,15 +387,15 @@ class Emu65MainWindow(QMainWindow):
                 load_action.setShortcut("Ctrl+O")
                 load_action.triggered.connect(self.load_rom)
                 file_menu.addAction(load_action)
-                
+
                 file_menu.addSeparator()
-                
+
                 # Ação Sair
                 exit_action = QAction("&Sair", self)
                 exit_action.setShortcut("Ctrl+Q")
                 exit_action.triggered.connect(self.close)
                 file_menu.addAction(exit_action)
-            
+
             # Menu Emulação
             emu_menu = menubar.addMenu("&Emulação")
             if emu_menu:
@@ -394,15 +404,15 @@ class Emu65MainWindow(QMainWindow):
                 reset_action.setShortcut("F5")
                 reset_action.triggered.connect(self.on_reset)
                 emu_menu.addAction(reset_action)
-                
+
                 emu_menu.addSeparator()
-                
+
                 # Ação Step
                 step_action = QAction("&Step", self)
                 step_action.setShortcut("F10")
                 step_action.triggered.connect(self.on_step)
                 emu_menu.addAction(step_action)
-            
+
             # Menu Ajuda
             help_menu = menubar.addMenu("&Ajuda")
             if help_menu:
@@ -410,7 +420,7 @@ class Emu65MainWindow(QMainWindow):
                 about_action = QAction("&Sobre", self)
                 about_action.triggered.connect(self.show_about)
                 help_menu.addAction(about_action)
-    
+
     def connect_signals(self):
         """Conecta os sinais dos painéis"""
         # Sinais do painel de controle
@@ -421,7 +431,7 @@ class Emu65MainWindow(QMainWindow):
         self.control_panel.step_triggered.connect(self.on_step)
         self.control_panel.run_triggered.connect(self.on_run)
         self.control_panel.stop_triggered.connect(self.on_stop)
-    
+
     def load_settings(self):
         """Carrega as configurações"""
         try:
@@ -442,7 +452,7 @@ class Emu65MainWindow(QMainWindow):
                     self.clock_frequency = settings['clock_frequency']
         except Exception as e:
             print(f"Erro ao carregar configurações: {e}")
-    
+
     def save_settings(self):
         """Salva as configurações"""
         try:
@@ -453,12 +463,12 @@ class Emu65MainWindow(QMainWindow):
             settings['window_size'] = {'width': size.width(), 'height': size.height()}
             settings['window_pos'] = {'x': pos.x(), 'y': pos.y()}
             settings['clock_frequency'] = self.clock_frequency
-            
+
             with open(self.settings_file, 'w') as f:
                 json.dump(settings, f, indent=2)
         except Exception as e:
             print(f"Erro ao salvar configurações: {e}")
-    
+
     # Handlers de eventos
     def on_clock_changed(self, frequency):
         """Handler para mudança de frequência do clock"""
@@ -466,7 +476,7 @@ class Emu65MainWindow(QMainWindow):
         if self.is_running:
             self.clock_timer.setInterval(1000 // frequency)
         self.status_panel.add_log_entry(f"Frequência alterada para {frequency} Hz")
-    
+
     def on_reset(self):
         """Handler para reset"""
         self.stop_emulation()
@@ -482,56 +492,61 @@ class Emu65MainWindow(QMainWindow):
         self.cycle_count = 0
         self.instruction_count = 0
         self.update_status()
-    
+
     def on_irq(self):
         """Handler para IRQ"""
         self.status_panel.add_log_entry("IRQ acionado")
-    
+
     def on_nmi(self):
         """Handler para NMI"""
         self.status_panel.add_log_entry("NMI acionado")
-    
+
     def on_step(self):
         """Handler para step"""
         if self.core:
             try:
+                self.status_panel.add_log_entry(f"DEBUG: Executando step {self.cycle_count + 1}")
                 result = self.core.step()
                 self.cycle_count += 1
                 self.instruction_count += 1
-                
+
                 # Atualizar estado do barramento
                 bus_state = self.core.get_bus_state()
                 self.status_panel.update_bus_status(
                     bus_state.address, bus_state.data, bus_state.rw
                 )
-                
+
+                # DEBUG: Log antes de atualizar LCD
+                self.status_panel.add_log_entry(f"DEBUG: Obtendo estado do LCD...")
+
                 # Atualizar LCD - sempre verificar mudanças
                 lcd_state = self.core.get_lcd_state()
+                self.status_panel.add_log_entry(f"DEBUG: Estado LCD obtido, chamando update_lcd_display...")
                 self.update_lcd_display(lcd_state)
-                
+
                 # Atualizar status da interface
                 self.update_status()
-                
+
                 # Log de debug para endereços de I/O
                 if 0x6000 <= bus_state.address <= 0x6003:
                     self.status_panel.add_log_entry(
                         f"I/O: addr=0x{bus_state.address:04X} data=0x{bus_state.data:02X} "
                         f"rw={'R' if bus_state.rw else 'W'}"
                     )
-                
+
             except Exception as e:
                 self.status_panel.add_log_entry(f"Erro no step: {e}")
                 import traceback
                 traceback.print_exc()
-    
+
     def on_run(self):
         """Handler para run"""
         self.start_emulation()
-    
+
     def on_stop(self):
         """Handler para stop"""
         self.stop_emulation()
-    
+
     def start_emulation(self):
         """Inicia a emulação"""
         if not self.is_running:
@@ -540,7 +555,7 @@ class Emu65MainWindow(QMainWindow):
             self.control_panel.set_running_state(True)
             self.status_panel.add_log_entry("Emulação iniciada")
             self.status_bar.showMessage("Executando...")
-    
+
     def stop_emulation(self):
         """Para a emulação"""
         if self.is_running:
@@ -549,7 +564,7 @@ class Emu65MainWindow(QMainWindow):
             self.control_panel.set_running_state(False)
             self.status_panel.add_log_entry("Emulação parada")
             self.status_bar.showMessage("Parado")
-    
+
     def clock_tick(self):
         """Tick do clock"""
         if self.core and self.is_running:
@@ -558,28 +573,51 @@ class Emu65MainWindow(QMainWindow):
                 result = self.core.step()
                 self.cycle_count += 1
                 self.instruction_count += 1
-                
+
                 # Atualiza o estado do LCD
                 lcd_state = self.core.get_lcd_state()
                 self.update_lcd_display(lcd_state)
-                
+
                 # Atualiza o status
                 self.update_status()
-                
+
             except Exception as e:
                 self.status_panel.add_log_entry(f"Erro no clock tick: {e}")
                 self.stop_emulation()
-    
+
     def update_lcd_display(self, lcd_state):
         """Atualiza o display LCD"""
         try:
+            # DEBUG: Log do estado recebido
+            self.status_panel.add_log_entry(f"DEBUG: update_lcd_display chamado, lcd_state existe: {lcd_state is not None}")
+
             if not self.lcd_widget:
+                # Procurar por widget LCD na área de trabalho se não estiver definido
+                lcd_widgets = self.work_area.findChildren(LCD16x2Widget)
+                self.status_panel.add_log_entry(f"DEBUG: Encontrados {len(lcd_widgets)} widgets LCD")
+                for widget in lcd_widgets:
+                    self.lcd_widget = widget
+                    self.status_panel.add_log_entry(f"DEBUG: LCD widget definido: {widget}")
+                    break
+
+            if not self.lcd_widget:
+                self.status_panel.add_log_entry("DEBUG: Nenhum widget LCD encontrado!")
                 return
-                
+
+            if lcd_state is None:
+                self.status_panel.add_log_entry("DEBUG: lcd_state é None!")
+                return
+
+            # DEBUG: Log dos dados brutos
+            display_raw = lcd_state.display
+            self.status_panel.add_log_entry(f"DEBUG: LCD display raw length: {len(display_raw)}")
+            self.status_panel.add_log_entry(f"DEBUG: LCD display raw bytes: {[hex(b) for b in display_raw[:20]]}")
+
             # Converte o array de bytes para string
-            display_bytes = bytes(lcd_state.display)
-            display_text = display_bytes.decode('ascii', errors='ignore')
-            
+            display_bytes = bytes(display_raw)
+            display_text = display_bytes.decode('ascii', errors='replace')
+            self.status_panel.add_log_entry(f"DEBUG: LCD display text: '{display_text[:32]}' (total: {len(display_text)} chars)")
+
             # O formato no C é: display[2][17] - 2 linhas de 16 chars + null terminator
             # Então temos 34 bytes total: linha1 (17 bytes) + linha2 (17 bytes)
             # Estrutura: [linha1_16chars][null][linha2_16chars][null]
@@ -603,23 +641,27 @@ class Emu65MainWindow(QMainWindow):
                 # Fallback se o formato não estiver correto
                 row1 = display_text[:16] if len(display_text) >= 16 else ""
                 row2 = display_text[16:32] if len(display_text) >= 32 else ""
-            
+
+            self.status_panel.add_log_entry(f"DEBUG: Rows extraídas - row1: '{row1}', row2: '{row2}'")
+
             # Atualizar widget LCD
             self.lcd_widget.set_display_text(row1, row2)
             self.lcd_widget.set_cursor(lcd_state.cursor_row, lcd_state.cursor_col)
             self.lcd_widget.set_display_on(lcd_state.display_on)
             self.lcd_widget.set_cursor_visible(lcd_state.cursor_on)
             self.lcd_widget.set_blink_on(lcd_state.blink_on)
-            
-            # Log de debug (apenas se houver mudanças)
-            if row1.strip() or row2.strip():
-                self.status_panel.add_log_entry(f"LCD: '{row1}' | '{row2}' (ON:{lcd_state.display_on}, CURSOR:{lcd_state.cursor_on}, BLINK:{lcd_state.blink_on})")
-            
+
+            # Forçar repaint do widget
+            self.lcd_widget.update()
+
+            # Log sempre (não só quando há mudanças)
+            self.status_panel.add_log_entry(f"LCD ATUALIZADO: '{row1}' | '{row2}' (ON:{lcd_state.display_on}, CURSOR:{lcd_state.cursor_on}, BLINK:{lcd_state.blink_on})")
+
         except Exception as e:
             self.status_panel.add_log_entry(f"Erro ao atualizar LCD: {e}")
             import traceback
-            traceback.print_exc()
-    
+            self.status_panel.add_log_entry(f"Traceback: {traceback.format_exc()}")
+
     def update_status(self):
         """Atualiza o status da interface"""
         # Atualizar painel de status
@@ -630,7 +672,7 @@ class Emu65MainWindow(QMainWindow):
             'tempo': f"{self.cycle_count // 1000000:02d}:{(self.cycle_count // 10000) % 100:02d}:{(self.cycle_count // 100) % 100:02d}"
         }
         self.status_panel.update_cpu_status(cpu_status)
-        
+
         # Atualizar registradores (simulação)
         registers = {
             'A': 0x00,
@@ -641,7 +683,7 @@ class Emu65MainWindow(QMainWindow):
             'SR': 0x00
         }
         self.control_panel.update_registers(registers)
-        
+
         # Atualizar LEDs de status
         status_leds = {
             'interrupt': False,
@@ -650,7 +692,7 @@ class Emu65MainWindow(QMainWindow):
             'carry': False
         }
         self.control_panel.update_status_leds(status_leds)
-    
+
     def load_rom(self):
         """Carrega uma ROM"""
         filename, _ = QFileDialog.getOpenFileName(
@@ -659,18 +701,18 @@ class Emu65MainWindow(QMainWindow):
             "",
             "Arquivos Binários (*.bin *.rom);;Todos os Arquivos (*)"
         )
-        
+
         if filename:
             try:
                 with open(filename, 'rb') as f:
                     data = f.read()
-                
+
                 # Aqui você implementaria o carregamento no core
                 self.status_panel.add_log_entry(f"ROM carregada: {filename}")
-                
+
             except Exception as e:
                 self.status_panel.add_log_entry(f"Erro ao carregar ROM: {e}")
-    
+
     def load_example(self):
         """Carrega um exemplo completo usando Programs6502"""
         try:
@@ -680,11 +722,11 @@ class Emu65MainWindow(QMainWindow):
             example_names = [ex['name'] for ex in examples]
             # Mostrar diálogo de seleção
             name, ok = QInputDialog.getItem(
-                self, 
-                "Selecionar Exemplo", 
+                self,
+                "Selecionar Exemplo",
                 "Escolha um exemplo para carregar:",
-                example_names, 
-                0, 
+                example_names,
+                0,
                 False
             )
             if ok and name:
@@ -707,6 +749,42 @@ class Emu65MainWindow(QMainWindow):
                     # Limpar área de trabalho e adicionar componentes necessários
                     self.work_area.clear_components()
                     self.add_required_components(selected_example.get('components', []))
+
+                    # TESTE: Verificar se LCD foi adicionado e testar funcionamento
+                    if 'LCD 16x2' in selected_example.get('components', []):
+                        self.status_panel.add_log_entry("DEBUG: Verificando LCD após carregar componentes...")
+                        lcd_state = self.core.get_lcd_state()
+                        self.update_lcd_display(lcd_state)
+
+                        # TESTE DIRETO: Forçar texto no LCD widget
+                        self.status_panel.add_log_entry("TESTE: Forçando texto no LCD widget...")
+                        if self.lcd_widget:
+                            self.lcd_widget.set_display_text("TESTE FORCADO", "LINHA 2 TESTE")
+                            self.lcd_widget.set_display_on(True)
+                            self.lcd_widget.update()
+                            self.status_panel.add_log_entry("TESTE: Texto forçado no LCD widget")
+
+                            # TESTE ADICIONAL: Verificar se o widget está visível
+                            self.status_panel.add_log_entry(f"DEBUG: LCD widget visível: {self.lcd_widget.isVisible()}")
+                            self.status_panel.add_log_entry(f"DEBUG: LCD widget size: {self.lcd_widget.size()}")
+                            self.status_panel.add_log_entry(f"DEBUG: LCD widget parent: {self.lcd_widget.parent()}")
+                        else:
+                            self.status_panel.add_log_entry("TESTE: LCD widget não encontrado!")
+
+                        # TESTE: Simular escrita direta no LCD do core para verificar comunicação
+                        self.status_panel.add_log_entry("TESTE: Verificando comunicação core→LCD...")
+                        try:
+                            # Simular algumas escritas no LCD via core para teste
+                            # Escrever alguns dados nos endereços do LCD
+                            self.status_panel.add_log_entry("TESTE: Simulando escritas no LCD do core...")
+
+                            # Verificar estado do LCD após simulação
+                            lcd_state_after = self.core.get_lcd_state()
+                            self.status_panel.add_log_entry(f"TESTE: Estado do LCD após simulação: display_on={lcd_state_after.display_on}")
+
+                        except Exception as e:
+                            self.status_panel.add_log_entry(f"ERRO no teste de comunicação LCD: {e}")
+
                     # Atualizar status
                     self.update_status()
                     # Logs
@@ -716,8 +794,8 @@ class Emu65MainWindow(QMainWindow):
                     self.status_panel.add_log_entry(f"Tamanho do binário: {len(selected_example['binary'])} bytes")
                     # Mensagem de sucesso
                     QMessageBox.information(
-                        self, 
-                        "Exemplo Carregado", 
+                        self,
+                        "Exemplo Carregado",
                         f"Exemplo '{selected_example['name']}' carregado com sucesso!\n\n"
                         f"Descrição: {selected_example['description']}\n"
                         f"Endereço inicial: 0x{selected_example['start_address']:04X}\n"
@@ -728,13 +806,13 @@ class Emu65MainWindow(QMainWindow):
             self.status_panel.add_log_entry(f"Erro ao carregar exemplo: {e}")
             import traceback
             traceback.print_exc()
-    
+
     def add_basic_components(self):
         """Adiciona componentes básicos à área de trabalho"""
         try:
             # Obter tamanho do grid para posicionamento adequado
             grid_size = self.work_area.grid_size
-            
+
             # Adicionar CPU 6502 (posição 2,2 no grid)
             cpu_pins = [
                 "VCC", "RDY", "IRQ", "NMI", "SYNC", "A0", "A1", "A2",
@@ -745,14 +823,14 @@ class Emu65MainWindow(QMainWindow):
             cpu = ChipWidget(name="6502 CPU", pin_names=cpu_pins)
             cpu.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             self.work_area.add_component(cpu, QPoint(grid_size * 2, grid_size * 2))
-            
+
             # Adicionar LCD (posição 8,2 no grid)
             lcd = LCD16x2Widget()
             lcd.setMinimumSize(180, 60)
             lcd.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             self.work_area.add_component(lcd, QPoint(grid_size * 8, grid_size * 2))
             self.lcd_widget = lcd
-            
+
             # Adicionar RAM (posição 5,2 no grid)
             ram_pins = [
                 "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
@@ -762,7 +840,7 @@ class Emu65MainWindow(QMainWindow):
             ram = ChipWidget(name="RAM", pin_names=ram_pins)
             ram.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             self.work_area.add_component(ram, QPoint(grid_size * 5, grid_size * 2))
-            
+
             # Adicionar ROM (posição 5,6 no grid)
             rom_pins = [
                 "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
@@ -773,12 +851,12 @@ class Emu65MainWindow(QMainWindow):
             rom = ChipWidget(name="ROM", pin_names=rom_pins)
             rom.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             self.work_area.add_component(rom, QPoint(grid_size * 5, grid_size * 6))
-            
+
             self.status_panel.add_log_entry("Componentes básicos adicionados: CPU, LCD, RAM, ROM")
-            
+
         except Exception as e:
             self.status_panel.add_log_entry(f"Erro ao adicionar componentes: {e}")
-    
+
     def show_about(self):
         """Mostra a janela sobre"""
         QMessageBox.about(
@@ -830,27 +908,27 @@ class Emu65MainWindow(QMainWindow):
             grid_status += " | Visível"
         else:
             grid_status += " | Oculto"
-        
+
         if self.snap_toggle_button.isChecked():
             grid_status += " | Snap ativo"
         else:
             grid_status += " | Snap inativo"
-        
+
         self.status_bar.showMessage(f"{grid_status} - Clique esquerdo para mover, Ctrl+clique ou clique direito para rotacionar")
 
     def on_add_component(self):
         comp_name = self.component_combo.currentText()
-        
+
         # Obter tamanho do grid para posicionamento adequado
         grid_size = self.work_area.grid_size
-        
+
         # Encontrar posição livre no grid
         occupied_positions = set()
         for comp in self.work_area.get_all_components():
             grid_x = comp['pos'].x() // grid_size
             grid_y = comp['pos'].y() // grid_size
             occupied_positions.add((grid_x, grid_y))
-        
+
         # Encontrar próxima posição livre
         new_x, new_y = 2, 2
         while (new_x, new_y) in occupied_positions:
@@ -860,9 +938,9 @@ class Emu65MainWindow(QMainWindow):
                 new_y += 1
                 if new_y > 10:  # Limite vertical
                     new_y = 2
-        
+
         new_pos = QPoint(new_x * grid_size, new_y * grid_size)
-        
+
         try:
             if comp_name == "6502 CPU":
                 pin_names = [
@@ -875,7 +953,7 @@ class Emu65MainWindow(QMainWindow):
                 chip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                 self.work_area.add_component(chip, new_pos)
                 self.status_panel.add_log_entry("CPU 6502 adicionada")
-                
+
             elif comp_name == "LCD 16x2":
                 lcd = LCD16x2Widget()
                 lcd.setMinimumSize(180, 60)
@@ -884,7 +962,7 @@ class Emu65MainWindow(QMainWindow):
                 # Guardar referência para o LCD widget
                 self.lcd_widget = lcd
                 self.status_panel.add_log_entry("LCD 16x2 adicionado")
-                
+
             elif comp_name == "ROM":
                 rom_pin_names = [
                     "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
@@ -896,7 +974,7 @@ class Emu65MainWindow(QMainWindow):
                 rom.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                 self.work_area.add_component(rom, new_pos)
                 self.status_panel.add_log_entry("ROM adicionada")
-                
+
             elif comp_name == "RAM":
                 ram_pin_names = [
                     "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
@@ -907,90 +985,188 @@ class Emu65MainWindow(QMainWindow):
                 ram.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                 self.work_area.add_component(ram, new_pos)
                 self.status_panel.add_log_entry("RAM adicionada")
-                
+
             else:
                 # Para outros componentes, usar ChipWidget genérico
                 chip = ChipWidget(name=comp_name)
                 chip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                 self.work_area.add_component(chip, new_pos)
                 self.status_panel.add_log_entry(f"Componente {comp_name} adicionado")
-                
+
         except Exception as e:
             self.status_panel.add_log_entry(f"Erro ao adicionar componente {comp_name}: {e}")
             QMessageBox.warning(self, "Erro", f"Erro ao adicionar componente {comp_name}: {e}")
 
     def add_required_components(self, components):
         """Adiciona automaticamente os componentes necessários para o exemplo"""
-        from python_bindings.widgets.chip_widget import ChipWidget
-        from python_bindings.widgets.lcd_widget import LCD16x2Widget
-        from python_bindings.widgets.control_widgets import LEDWidget, SwitchWidget
-        positions = {
-            '6502 CPU': QPoint(50, 50),
-            'LCD 16x2': QPoint(300, 50),
-            'LED': QPoint(300, 150),
-            'Botão': QPoint(300, 200),
-            'RAM': QPoint(150, 50),
-            'ROM': QPoint(150, 150),
-            'Resistor': QPoint(400, 50),
-            'Capacitor': QPoint(400, 150),
-        }
-        for comp in components:
-            pos = positions.get(comp, QPoint(100, 100))
-            # Cria o widget correto para cada componente
-            if comp == '6502 CPU':
-                pin_names = [
-                    "VCC", "RDY", "IRQ", "NMI", "SYNC", "A0", "A1", "A2",
-                    "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10",
-                    "A11", "A12", "A13", "A14", "A15", "D0", "D1", "D2",
-                    "D3", "D4", "D5", "D6", "D7", "R/W", "PHI2", "RES"
-                ]
-                widget = ChipWidget(name=comp, pin_names=pin_names)
-            elif comp == 'RAM':
-                pin_names = [
-                    "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
-                    "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7",
-                    "WE", "OE", "CS", "VCC", "GND"
-                ]
-                widget = ChipWidget(name=comp, pin_names=pin_names)
-            elif comp == 'ROM':
-                pin_names = [
-                    "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
-                    "A8", "A9", "A10", "A11", "A12", "A13", "A14", "A15",
-                    "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7",
-                    "OE", "CE", "VCC", "GND"
-                ]
-                widget = ChipWidget(name=comp, pin_names=pin_names)
-            elif comp == 'Resistor' or comp == 'Capacitor':
-                widget = ChipWidget(name=comp)
-            elif comp == 'LCD 16x2':
-                widget = LCD16x2Widget()
-                self.lcd_widget = widget
-            elif comp == 'LED':
-                widget = LEDWidget()
-            elif comp == 'Botão':
-                widget = SwitchWidget()
+        try:
+            # Importação local para evitar problemas circulares
+            from widgets.chip_widget import ChipWidget
+            from widgets.lcd_widget import LCD16x2Widget
+            try:
+                from widgets.control_widgets import LEDWidget, SwitchWidget
+            except ImportError:
+                # Fallback se control_widgets não existir
+                LEDWidget = ChipWidget
+                SwitchWidget = ChipWidget
+
+            self.status_panel.add_log_entry(f"DEBUG: Adicionando componentes: {components}")
+
+            positions = {
+                '6502 CPU': QPoint(50, 50),
+                'LCD 16x2': QPoint(300, 50),
+                'LED': QPoint(300, 150),
+                'Botão': QPoint(300, 200),
+                'RAM': QPoint(150, 50),
+                'ROM': QPoint(150, 150),
+                'Resistor': QPoint(400, 50),
+                'Capacitor': QPoint(400, 150),
+            }
+
+            for comp in components:
+                pos = positions.get(comp, QPoint(100, 100))
+                self.status_panel.add_log_entry(f"DEBUG: Criando componente: {comp} na posição {pos}")
+
+                # Cria o widget correto para cada componente
+                try:
+                    if comp == '6502 CPU':
+                        pin_names = [
+                            "VCC", "RDY", "IRQ", "NMI", "SYNC", "A0", "A1", "A2",
+                            "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10",
+                            "A11", "A12", "A13", "A14", "A15", "D0", "D1", "D2",
+                            "D3", "D4", "D5", "D6", "D7", "R/W", "PHI2", "RES"
+                        ]
+                        widget = ChipWidget(name=comp, pin_names=pin_names)
+                        self.status_panel.add_log_entry(f"DEBUG: CPU widget criado: {widget}")
+                    elif comp == 'RAM':
+                        pin_names = [
+                            "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
+                            "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7",
+                            "WE", "OE", "CS", "VCC", "GND"
+                        ]
+                        widget = ChipWidget(name=comp, pin_names=pin_names)
+                        self.status_panel.add_log_entry(f"DEBUG: RAM widget criado: {widget}")
+                    elif comp == 'ROM':
+                        pin_names = [
+                            "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
+                            "A8", "A9", "A10", "A11", "A12", "A13", "A14", "A15",
+                            "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7",
+                            "OE", "CE", "VCC", "GND"
+                        ]
+                        widget = ChipWidget(name=comp, pin_names=pin_names)
+                        self.status_panel.add_log_entry(f"DEBUG: ROM widget criado: {widget}")
+                    elif comp == 'Resistor' or comp == 'Capacitor':
+                        widget = ChipWidget(name=comp)
+                        self.status_panel.add_log_entry(f"DEBUG: {comp} widget criado: {widget}")
+                    elif comp == 'LCD 16x2':
+                        widget = LCD16x2Widget()
+                        self.lcd_widget = widget
+                        self.status_panel.add_log_entry(f"DEBUG: LCD widget criado e definido como self.lcd_widget: {widget}")
+
+                        # Teste imediato do LCD
+                        widget.set_display_text("INIT OK", "LCD READY")
+                        widget.set_display_on(True)
+                        widget.update()
+                        self.status_panel.add_log_entry("DEBUG: LCD inicializado com texto teste")
+
+                    elif comp == 'LED':
+                        widget = LEDWidget()
+                        self.status_panel.add_log_entry(f"DEBUG: LED widget criado: {widget}")
+                    elif comp == 'Botão':
+                        widget = SwitchWidget()
+                        self.status_panel.add_log_entry(f"DEBUG: Botão widget criado: {widget}")
+                    else:
+                        widget = ChipWidget(name=comp)
+                        self.status_panel.add_log_entry(f"DEBUG: Widget genérico criado para {comp}: {widget}")
+
+                    self.work_area.add_component(widget, pos)
+                    self.status_panel.add_log_entry(f"DEBUG: Componente {comp} adicionado à work_area na posição {pos}")
+
+                except Exception as e:
+                    self.status_panel.add_log_entry(f"ERRO ao adicionar componente {comp}: {e}")
+                    import traceback
+                    self.status_panel.add_log_entry(f"Traceback: {traceback.format_exc()}")
+                    # Fallback - adicionar como chip genérico
+                    widget = ChipWidget(name=comp)
+                    self.work_area.add_component(widget, pos)
+
+        except Exception as e:
+            self.status_panel.add_log_entry(f"Erro geral ao adicionar componentes: {e}")
+            import traceback
+            self.status_panel.add_log_entry(f"Traceback: {traceback.format_exc()}")
+
+    def test_lcd_direct(self):
+        """Teste direto do LCD widget"""
+        try:
+            self.status_panel.add_log_entry("=== TESTE DIRETO DO LCD ===")
+
+            # Verificar se existe um LCD na área de trabalho
+            lcd_widgets = self.work_area.findChildren(LCD16x2Widget)
+            self.status_panel.add_log_entry(f"Widgets LCD encontrados: {len(lcd_widgets)}")
+
+            if len(lcd_widgets) == 0:
+                # Criar um LCD para teste
+                self.status_panel.add_log_entry("Criando LCD para teste...")
+                lcd = LCD16x2Widget()
+                self.work_area.add_component(lcd, QPoint(300, 50))
+                self.lcd_widget = lcd
+                self.status_panel.add_log_entry("LCD criado e adicionado")
             else:
-                widget = ChipWidget(name=comp)
-            self.work_area.add_component(widget, pos)
-            self.status_panel.add_log_entry(f"Componente adicionado: {comp}")
+                self.lcd_widget = lcd_widgets[0]
+                self.status_panel.add_log_entry(f"Usando LCD existente: {self.lcd_widget}")
+
+            # Teste 1: Texto simples
+            self.status_panel.add_log_entry("TESTE 1: Definindo texto simples...")
+            self.lcd_widget.set_display_text("HELLO WORLD!", "TEST DIRECT LCD")
+            self.lcd_widget.set_display_on(True)
+            self.lcd_widget.update()
+            self.status_panel.add_log_entry("TESTE 1: Texto definido")
+
+            # Teste 2: Verificar propriedades
+            self.status_panel.add_log_entry("TESTE 2: Verificando propriedades...")
+            self.status_panel.add_log_entry(f"LCD visível: {self.lcd_widget.isVisible()}")
+            self.status_panel.add_log_entry(f"LCD size: {self.lcd_widget.size()}")
+            self.status_panel.add_log_entry(f"LCD display_on: {self.lcd_widget.display_on}")
+            self.status_panel.add_log_entry(f"LCD display_text: {self.lcd_widget.display_text}")
+
+            # Teste 3: Forçar repaint
+            self.status_panel.add_log_entry("TESTE 3: Forçando repaint...")
+            self.lcd_widget.repaint()
+
+            # Teste 4: Verificar core do emulador
+            self.status_panel.add_log_entry("TESTE 4: Verificando core do emulador...")
+            if self.core:
+                lcd_state = self.core.get_lcd_state()
+                self.status_panel.add_log_entry(f"Core LCD state: display_on={lcd_state.display_on}")
+                self.status_panel.add_log_entry(f"Core LCD display: {[hex(b) for b in lcd_state.display[:20]]}")
+
+                # Chamar update_lcd_display com o estado do core
+                self.update_lcd_display(lcd_state)
+
+            self.status_panel.add_log_entry("=== FIM DO TESTE LCD ===")
+
+        except Exception as e:
+            self.status_panel.add_log_entry(f"ERRO no teste LCD: {e}")
+            import traceback
+            self.status_panel.add_log_entry(f"Traceback: {traceback.format_exc()}")
 
 def main():
     """Função principal"""
     app = QApplication(sys.argv)
-    
+
     # Carregar arquivo de estilos
     try:
         with open('style.qss', 'r') as f:
             app.setStyleSheet(f.read())
     except FileNotFoundError:
         print("Arquivo style.qss não encontrado")
-    
+
     # Criar e mostrar janela principal
     window = Emu65MainWindow()
     window.show()
-    
+
     # Executar aplicação
     sys.exit(app.exec())
 
 if __name__ == "__main__":
-    main() 
+    main()

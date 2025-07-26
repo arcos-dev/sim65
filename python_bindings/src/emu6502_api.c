@@ -43,45 +43,12 @@ typedef struct {
 
     bool initialized;
     bool running;
+
+    // Callback para interceptar escritas
+    void (*write_callback)(struct emu6502_context* ctx, uint16_t address, uint8_t value);
 } emu6502_context_t;
 
-// Função auxiliar para processar escritas no LCD via VIA
-static void process_lcd_write(emu6502_context_t* ctx, uint16_t address, uint8_t value) {
-    static uint8_t last_portb = 0;  // Dados do LCD
-    static uint8_t last_porta = 0;  // Controle do LCD
-    static bool last_enable = false;
-
-    printf("[LCD DEBUG] Write: 0x%04X = 0x%02X\n", address, value);
-
-    if (address == 0x6000) {
-        // PORTB - dados para LCD
-        last_portb = value;
-        printf("[LCD DEBUG] PORTB = 0x%02X\n", value);
-    } else if (address == 0x6001) {
-        // PORTA - controle LCD
-        last_porta = value;
-        bool enable = (value & 0x20) != 0;  // Bit 5 = E (Enable)
-        bool rs = (value & 0x40) != 0;      // Bit 6 = RS (Register Select)
-
-        printf("[LCD DEBUG] PORTA = 0x%02X, E=%d, RS=%d\n", value, enable, rs);
-
-        // Detectar transição de enable (alto para baixo = latch)
-        if (last_enable && !enable) {
-            printf("[LCD DEBUG] Enable transition detected\n");
-            if (rs) {
-                // RS=1: dados (caractere)
-                printf("[LCD DEBUG] Writing char: 0x%02X ('%c')\n", last_portb, last_portb);
-                emu6502_lcd_write_char(ctx, (char)last_portb);
-            } else {
-                // RS=0: comando
-                printf("[LCD DEBUG] Writing command: 0x%02X\n", last_portb);
-                lcd_16x2_write_command(ctx, last_portb);
-            }
-        }
-
-        last_enable = enable;
-    }
-}// Função auxiliar para inicializar o LCD state
+// Função auxiliar para inicializar o LCD state
 static void init_lcd_state(lcd_16x2_state_t* lcd) {
     memset(lcd->display, ' ', 32);
     lcd->display[16] = '\0';
@@ -187,9 +154,12 @@ EMU6502_API int emu6502_init(void* emu) {
         return -1;
     }
 
-    // Inicializar CPU com o bus
+    // Inicializar CPU com o bus - SEMPRE FORÇAR NOVA INSTÂNCIA
+    // Primeiro destruir CPU existente (se houver) para resolver problema de singleton
+    cpu6502_destroy();
+
     if (cpu6502_init(&ctx->bus) != 0) {
-        // Limpar em caso de erro
+        // Se falhou após destruição, erro real
         bus_destroy(&ctx->bus);
         if (ctx->via) via_destroy(ctx->via);
         if (ctx->acia) acia_destroy(ctx->acia);
@@ -210,7 +180,15 @@ EMU6502_API int emu6502_reset(void* emu) {
         return -1;
     }
 
-    return cpu6502_reset();
+    // cpu6502_reset() retorna número de ciclos (7), não código de erro
+    // Valores positivos são sucesso, negativos são erro
+    int result = cpu6502_reset();
+
+    if (result < 0) {
+        return result; // Erro real
+    }
+
+    return 0; // Sucesso - convertemos ciclos para código de sucesso
 }
 
 EMU6502_API int emu6502_step(void* emu) {
@@ -265,10 +243,12 @@ EMU6502_API int emu6502_load_program(void* emu, const char* data, size_t size, u
         bus_write_memory(&ctx->bus, address + i, (uint8_t)data[i]);
     }
 
-    return 0;
-}
+    // IMPORTANTE: Configurar vetor de reset para apontar para o endereço inicial
+    bus_write_memory(&ctx->bus, 0xFFFC, address & 0xFF);        // Low byte
+    bus_write_memory(&ctx->bus, 0xFFFD, (address >> 8) & 0xFF); // High byte
 
-EMU6502_API int emu6502_load_rom(void* emu, const char* data, size_t size, uint16_t address) {
+    return 0;
+}EMU6502_API int emu6502_load_rom(void* emu, const char* data, size_t size, uint16_t address) {
     // Para esta implementação, ROM e programa são tratados da mesma forma
     return emu6502_load_program(emu, data, size, address);
 }
@@ -307,8 +287,61 @@ EMU6502_API void emu6502_write_byte(void* emu, uint16_t address, uint8_t value) 
     }
 
     // Interceptar escritas no VIA para LCD
-    if (address == 0x6000 || address == 0x6001) {
-        process_lcd_write(ctx, address, value);
+    if (address >= 0x6000 && address <= 0x600F) {
+        static uint8_t last_porta_data = 0;  // Valor escrito no PORTA (dados LCD)
+
+        printf("VIA Write: address=0x%04X, value=0x%02X\n", address, value);
+        fflush(stdout);
+
+        // Fazer a escrita no bus primeiro
+        bus_write_memory(&ctx->bus, address, value);
+
+        // PORTA (0x6001) - dados do LCD (Ben Eater style)
+        if (address == 0x6001) {
+            last_porta_data = value;
+            printf("LCD Data stored (PORTA): 0x%02X ('%c')\n", value,
+                   (value >= 32 && value < 127) ? value : '?');
+            fflush(stdout);
+        }
+
+        // PORTB (0x6000) - controle do LCD (Ben Eater style)
+        if (address == 0x6000) {
+            printf("LCD Control (PORTB): 0x%02X\n", value);
+            fflush(stdout);
+            bool rs = value & 0x01;  // RS bit (PB0)
+            bool e = value & 0x02;   // Enable bit (PB1)
+            bool rw = value & 0x04;  // RW bit (PB2)
+
+            printf("Control bits: RS=%d, E=%d, RW=%d\n", rs, e, rw);
+            fflush(stdout);
+
+            // Quando Enable vai para alto e não é leitura
+            if (e && !rw) {
+                printf("LCD Data from stored PORTA: 0x%02X ('%c')\n", last_porta_data,
+                       (last_porta_data >= 32 && last_porta_data < 127) ? last_porta_data : '?');
+                fflush(stdout);
+
+                if (rs) {
+                    // RS=1: Dados (escrever caractere)
+                    if (last_porta_data >= 32 && last_porta_data < 127) {
+                        emu6502_lcd_write_char(emu, last_porta_data);
+                        printf("LCD: Caractere '%c' escrito no display\n", last_porta_data);
+                        fflush(stdout);
+                    }
+                } else {
+                    // RS=0: Comando
+                    printf("LCD: Comando 0x%02X\n", last_porta_data);
+                    fflush(stdout);
+                    if (last_porta_data == 0x01) {
+                        emu6502_lcd_clear(emu);
+                        printf("LCD: Display limpo\n");
+                        fflush(stdout);
+                    }
+                }
+            }
+        }
+
+        return; // Já fizemos a escrita
     }
 
     bus_write_memory(&ctx->bus, address, value);

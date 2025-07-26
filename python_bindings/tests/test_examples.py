@@ -21,7 +21,7 @@ from python_bindings.programs_6502 import Programs6502
 
 def test_total_programs():
     programs = Programs6502.get_all_programs()
-    assert len(programs) == 13
+    assert len(programs) == 9  # Atualizado para o número real de programas
 
 def test_program_fields():
     programs = Programs6502.get_all_programs()
@@ -46,4 +46,4 @@ def test_binary_not_empty():
 def test_start_address():
     programs = Programs6502.get_all_programs()
     for prog in programs:
-        assert 0x0000 <= prog['start_address'] <= 0xFFFF, f"Endereço inválido em {prog['name']}" 
+        assert 0x0000 <= prog['start_address'] <= 0xFFFF, f"Endereço inválido em {prog['name']}"

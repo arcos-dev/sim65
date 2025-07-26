@@ -14,7 +14,12 @@ Pillow>=8.3.0
 # Utilitários
 pathlib2>=2.3.0
 
-# Desenvolvimento (opcional)
+# Desenvolvimento e testes
 pytest>=6.2.0
+pytest-qt>=4.2.0  # Para testes de GUI Qt
+pytest-xvfb>=2.0.0  # Para testes GUI em ambientes sem display
+pytest-timeout>=2.0.0  # Para timeouts em testes
+pytest-cov>=3.0.0  # Para cobertura de código
 black>=21.0.0
-flake8>=3.9.0 
+flake8>=3.9.0
+mypy>=0.950  # Para verificação de tipos
