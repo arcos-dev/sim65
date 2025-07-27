@@ -112,7 +112,7 @@ class LCD16x2Widget(QFrame):
 
         # Área do display (vidro)
         display_rect = self.rect().adjusted(10, 10, -10, -10)
-        
+
         # Gradiente para simular vidro
         gradient = QLinearGradient(display_rect.topLeft().toPointF(), display_rect.bottomRight().toPointF())
         if self.display_on:
@@ -121,7 +121,7 @@ class LCD16x2Widget(QFrame):
         else:
             gradient.setColorAt(0, colors['glass'])
             gradient.setColorAt(1, colors['bg'])
-        
+
         painter.setBrush(QBrush(gradient))
         painter.setPen(QPen(colors['frame'], 1))
         painter.drawRect(display_rect)
@@ -152,7 +152,7 @@ class LCD16x2Widget(QFrame):
             if self.cursor_visible and (not self.blink_on or self.blink_state):
                 cursor_y = y1 if self.cursor_row == 0 else y2
                 cursor_x = text_rect.left() + 5 + self.cursor_col * 20
-                
+
                 # Cursor como bloco sólido (mais realista)
                 painter.setBrush(QBrush(text_color))
                 painter.setPen(QPen(text_color, 1))
@@ -162,11 +162,11 @@ class LCD16x2Widget(QFrame):
             # Display desligado - mostra apenas silhueta do texto
             painter.setPen(QPen(colors['text']))
             painter.setFont(self.lcd_font)
-            
+
             # Linha 1 (muito sutil)
             y1 = text_rect.top() + 25
             painter.drawText(text_rect.left() + 5, y1, self.display_text[0])
-            
+
             # Linha 2 (muito sutil)
             y2 = text_rect.top() + 55
             painter.drawText(text_rect.left() + 5, y2, self.display_text[1])
@@ -189,3 +189,18 @@ class LCD16x2Widget(QFrame):
         status.append(f"Blink: {'ON' if self.blink_on else 'OFF'}")
         status.append(f"Text: '{self.display_text[0].strip()}' | '{self.display_text[1].strip()}'")
         return " | ".join(status)
+
+    def cleanup(self):
+        """Cleanup dos recursos do LCD widget"""
+        try:
+            if hasattr(self, 'blink_timer') and self.blink_timer:
+                self.blink_timer.stop()
+                self.blink_timer.timeout.disconnect()
+                self.blink_timer = None
+        except Exception as e:
+            print(f"Erro no cleanup do LCD widget: {e}")
+
+    def closeEvent(self, event):
+        """Cleanup quando o widget é fechado"""
+        self.cleanup()
+        super().closeEvent(event)

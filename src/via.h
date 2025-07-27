@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define VIA_BASE_ADDRESS 0xE000
-#define VIA_END_ADDRESS  0xE00F
+#define VIA_BASE_ADDRESS 0x6000
+#define VIA_END_ADDRESS  0x600F
 
 // Registradores do VIA 6522
 #define VIA_REG_ORB   0x00
@@ -70,4 +70,4 @@ void via_serial_feed(VIA6522 *via, const char *str); // Alimenta buffer de entra
 void via_tick_serial(VIA6522 *via); // Simula clock de serial
 void via_serial_rx_byte(VIA6522 *via, uint8_t byte); // Injeta byte recebido no SR
 
-#endif // VIA_H 
+#endif // VIA_H

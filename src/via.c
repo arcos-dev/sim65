@@ -89,11 +89,10 @@ uint8_t via_read(VIA6522 *via, uint16_t address) {
     switch (reg) {
         case VIA_REG_ORB: {
             uint8_t val = via->reg[VIA_REG_ORB];
-            // PB6: serial in
-            if (via->serial_in_head != via->serial_in_tail)
-                val |= VIA_SERIAL_IN_BIT;
-            else
-                val &= (uint8_t)~VIA_SERIAL_IN_BIT;
+            // Only manipulate PB6 (serial in) if the port is configured for serial operations
+            // For LCD operations, we need the full 8-bit value preserved
+            // TODO: Check if serial functionality is actually enabled before modifying bit 6
+            // For now, just return the stored value without modification
             return val;
         }
         case VIA_REG_ORA: {

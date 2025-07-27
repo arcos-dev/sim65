@@ -198,16 +198,6 @@ class Emu65MainWindow(QMainWindow):
 
         toolbar.addSeparator()
 
-        # Botão de teste LCD
-        btn_test_lcd = QPushButton("Teste LCD")
-        btn_test_lcd.setProperty("class", "toolbar-button")
-        btn_test_lcd.setMinimumHeight(35)
-        btn_test_lcd.setFont(QFont("Segoe UI Variable", 10, QFont.Weight.Bold))
-        btn_test_lcd.clicked.connect(self.test_lcd_direct)
-        toolbar.addWidget(btn_test_lcd)
-
-        toolbar.addSeparator()
-
         # ComboBox de componentes
         component_label = QLabel("Adicionar componente:")
         component_label.setProperty("class", "toolbar-label")
@@ -557,13 +547,23 @@ class Emu65MainWindow(QMainWindow):
             self.status_bar.showMessage("Executando...")
 
     def stop_emulation(self):
-        """Para a emulação"""
+        """Para a emulação de forma robusta"""
         if self.is_running:
             self.is_running = False
-            self.clock_timer.stop()
-            self.control_panel.set_running_state(False)
-            self.status_panel.add_log_entry("Emulação parada")
-            self.status_bar.showMessage("Parado")
+            # Parar timer com verificação
+            if hasattr(self, 'clock_timer') and self.clock_timer and self.clock_timer.isActive():
+                self.clock_timer.stop()
+
+            # Atualizar estado dos controles
+            if hasattr(self, 'control_panel') and self.control_panel:
+                self.control_panel.set_running_state(False)
+
+            # Log e status
+            if hasattr(self, 'status_panel') and self.status_panel:
+                self.status_panel.add_log_entry("Emulação parada")
+
+            if hasattr(self, 'status_bar') and self.status_bar:
+                self.status_bar.showMessage("Parado")
 
     def clock_tick(self):
         """Tick do clock"""
@@ -618,6 +618,11 @@ class Emu65MainWindow(QMainWindow):
             display_text = display_bytes.decode('ascii', errors='replace')
             self.status_panel.add_log_entry(f"DEBUG: LCD display text: '{display_text[:32]}' (total: {len(display_text)} chars)")
 
+            # DEBUG: Estados importantes do LCD
+            self.status_panel.add_log_entry(f"DEBUG: LCD Estados - display_on={lcd_state.display_on}, cursor_on={lcd_state.cursor_on}, blink_on={lcd_state.blink_on}")
+            self.status_panel.add_log_entry(f"DEBUG: LCD Cursor - row={lcd_state.cursor_row}, col={lcd_state.cursor_col}")
+            self.status_panel.add_log_entry(f"DEBUG: LCD Busy={lcd_state.busy}, function_set=0x{lcd_state.function_set:02X}")
+
             # O formato no C é: display[2][17] - 2 linhas de 16 chars + null terminator
             # Então temos 34 bytes total: linha1 (17 bytes) + linha2 (17 bytes)
             # Estrutura: [linha1_16chars][null][linha2_16chars][null]
@@ -644,18 +649,27 @@ class Emu65MainWindow(QMainWindow):
 
             self.status_panel.add_log_entry(f"DEBUG: Rows extraídas - row1: '{row1}', row2: '{row2}'")
 
-            # Atualizar widget LCD
-            self.lcd_widget.set_display_text(row1, row2)
-            self.lcd_widget.set_cursor(lcd_state.cursor_row, lcd_state.cursor_col)
-            self.lcd_widget.set_display_on(lcd_state.display_on)
-            self.lcd_widget.set_cursor_visible(lcd_state.cursor_on)
-            self.lcd_widget.set_blink_on(lcd_state.blink_on)
+            # IMPORTANTE: Só atualizar se há mudança real ou se display está ligado
+            current_text_row1 = self.lcd_widget.display_text[0].strip() if self.lcd_widget.display_text else ""
+            current_text_row2 = self.lcd_widget.display_text[1].strip() if self.lcd_widget.display_text else ""
 
-            # Forçar repaint do widget
-            self.lcd_widget.update()
+            if (row1 != current_text_row1 or row2 != current_text_row2 or
+                lcd_state.display_on != self.lcd_widget.display_on):
 
-            # Log sempre (não só quando há mudanças)
-            self.status_panel.add_log_entry(f"LCD ATUALIZADO: '{row1}' | '{row2}' (ON:{lcd_state.display_on}, CURSOR:{lcd_state.cursor_on}, BLINK:{lcd_state.blink_on})")
+                # Atualizar widget LCD
+                self.lcd_widget.set_display_text(row1, row2)
+                self.lcd_widget.set_cursor(lcd_state.cursor_row, lcd_state.cursor_col)
+                self.lcd_widget.set_display_on(lcd_state.display_on)
+                self.lcd_widget.set_cursor_visible(lcd_state.cursor_on)
+                self.lcd_widget.set_blink_on(lcd_state.blink_on)
+
+                # Forçar repaint do widget
+                self.lcd_widget.update()
+
+                # Log da mudança
+                self.status_panel.add_log_entry(f"LCD MUDANÇA DETECTADA: '{row1}' | '{row2}' (ON:{lcd_state.display_on}, CURSOR:{lcd_state.cursor_on}, BLINK:{lcd_state.blink_on})")
+            else:
+                self.status_panel.add_log_entry(f"LCD SEM MUDANÇA: '{row1}' | '{row2}' (ON:{lcd_state.display_on})")
 
         except Exception as e:
             self.status_panel.add_log_entry(f"Erro ao atualizar LCD: {e}")
@@ -756,34 +770,22 @@ class Emu65MainWindow(QMainWindow):
                         lcd_state = self.core.get_lcd_state()
                         self.update_lcd_display(lcd_state)
 
-                        # TESTE DIRETO: Forçar texto no LCD widget
-                        self.status_panel.add_log_entry("TESTE: Forçando texto no LCD widget...")
+                        # Verificar se LCD widget foi criado corretamente
                         if self.lcd_widget:
-                            self.lcd_widget.set_display_text("TESTE FORCADO", "LINHA 2 TESTE")
-                            self.lcd_widget.set_display_on(True)
-                            self.lcd_widget.update()
-                            self.status_panel.add_log_entry("TESTE: Texto forçado no LCD widget")
-
-                            # TESTE ADICIONAL: Verificar se o widget está visível
+                            self.status_panel.add_log_entry(f"DEBUG: LCD widget válido: {self.lcd_widget}")
                             self.status_panel.add_log_entry(f"DEBUG: LCD widget visível: {self.lcd_widget.isVisible()}")
                             self.status_panel.add_log_entry(f"DEBUG: LCD widget size: {self.lcd_widget.size()}")
                             self.status_panel.add_log_entry(f"DEBUG: LCD widget parent: {self.lcd_widget.parent()}")
                         else:
-                            self.status_panel.add_log_entry("TESTE: LCD widget não encontrado!")
+                            self.status_panel.add_log_entry("DEBUG: LCD widget não encontrado!")
 
-                        # TESTE: Simular escrita direta no LCD do core para verificar comunicação
-                        self.status_panel.add_log_entry("TESTE: Verificando comunicação core→LCD...")
+                        # Verificar estado inicial do LCD no core
                         try:
-                            # Simular algumas escritas no LCD via core para teste
-                            # Escrever alguns dados nos endereços do LCD
-                            self.status_panel.add_log_entry("TESTE: Simulando escritas no LCD do core...")
-
-                            # Verificar estado do LCD após simulação
                             lcd_state_after = self.core.get_lcd_state()
-                            self.status_panel.add_log_entry(f"TESTE: Estado do LCD após simulação: display_on={lcd_state_after.display_on}")
-
+                            self.status_panel.add_log_entry(f"DEBUG: Estado do LCD no core: display_on={lcd_state_after.display_on}")
+                            self.status_panel.add_log_entry(f"DEBUG: LCD display inicial: {[hex(b) for b in lcd_state_after.display[:16]]}")
                         except Exception as e:
-                            self.status_panel.add_log_entry(f"ERRO no teste de comunicação LCD: {e}")
+                            self.status_panel.add_log_entry(f"ERRO ao verificar estado do LCD: {e}")
 
                     # Atualizar status
                     self.update_status()
@@ -869,11 +871,68 @@ class Emu65MainWindow(QMainWindow):
         )
 
     def closeEvent(self, event):
-        """Evento de fechamento da janela"""
-        self.save_settings()
-        if self.core:
-            self.core.destroy()
-        event.accept()
+        """Evento de fechamento da janela com cleanup completo"""
+        try:
+            # 1. Parar emulação se estiver rodando
+            if self.is_running:
+                self.stop_emulation()
+
+            # 2. Parar explicitamente o timer principal
+            if hasattr(self, 'clock_timer') and self.clock_timer:
+                self.clock_timer.stop()
+                self.clock_timer.timeout.disconnect()
+                self.clock_timer = None
+
+            # 3. Limpar todos os widgets LCD (que têm blink_timer)
+            lcd_widgets = self.findChildren(LCD16x2Widget)
+            for lcd in lcd_widgets:
+                if hasattr(lcd, 'blink_timer') and lcd.blink_timer:
+                    lcd.blink_timer.stop()
+                    lcd.blink_timer.timeout.disconnect()
+                    lcd.blink_timer = None
+
+            # 4. Limpar componentes da work area
+            if hasattr(self, 'work_area') and self.work_area:
+                self.work_area.clear_components()
+
+            # 5. Salvar configurações
+            self.save_settings()
+
+            # 6. Destruir core do emulador (com timeout)
+            if hasattr(self, 'core') and self.core:
+                try:
+                    # Usar QTimer.singleShot para timeout na destruição
+                    import threading
+
+                    def destroy_core():
+                        try:
+                            self.core.destroy()
+                        except Exception as e:
+                            print(f"Erro na destruição do core: {e}")
+
+                    # Executar destruição em thread separada com timeout
+                    destroy_thread = threading.Thread(target=destroy_core)
+                    destroy_thread.daemon = True  # Thread daemon para não bloquear o fechamento
+                    destroy_thread.start()
+                    destroy_thread.join(timeout=2.0)  # Timeout de 2 segundos
+
+                    if destroy_thread.is_alive():
+                        print("Warning: Core cleanup timeout - forçando fechamento")
+
+                except Exception as e:
+                    print(f"Erro no cleanup do core: {e}")
+                finally:
+                    self.core = None
+
+            # 7. Forçar processamento de eventos pendentes
+            if hasattr(self, 'app') and self.app:
+                self.app.processEvents()
+
+        except Exception as e:
+            print(f"Erro durante closeEvent: {e}")
+        finally:
+            # Sempre aceitar o evento de fechamento
+            event.accept()
 
     def on_component_moved(self, widget, new_position):
         """Handler para movimento de componente"""
@@ -1063,11 +1122,11 @@ class Emu65MainWindow(QMainWindow):
                         self.lcd_widget = widget
                         self.status_panel.add_log_entry(f"DEBUG: LCD widget criado e definido como self.lcd_widget: {widget}")
 
-                        # Teste imediato do LCD
-                        widget.set_display_text("INIT OK", "LCD READY")
-                        widget.set_display_on(True)
+                        # LCD começa vazio - sem texto de teste
+                        widget.set_display_text("", "")
+                        widget.set_display_on(False)  # Começa desligado até ser inicializado pelo programa
                         widget.update()
-                        self.status_panel.add_log_entry("DEBUG: LCD inicializado com texto teste")
+                        self.status_panel.add_log_entry("DEBUG: LCD inicializado vazio")
 
                     elif comp == 'LED':
                         widget = LEDWidget()
@@ -1095,61 +1154,6 @@ class Emu65MainWindow(QMainWindow):
             import traceback
             self.status_panel.add_log_entry(f"Traceback: {traceback.format_exc()}")
 
-    def test_lcd_direct(self):
-        """Teste direto do LCD widget"""
-        try:
-            self.status_panel.add_log_entry("=== TESTE DIRETO DO LCD ===")
-
-            # Verificar se existe um LCD na área de trabalho
-            lcd_widgets = self.work_area.findChildren(LCD16x2Widget)
-            self.status_panel.add_log_entry(f"Widgets LCD encontrados: {len(lcd_widgets)}")
-
-            if len(lcd_widgets) == 0:
-                # Criar um LCD para teste
-                self.status_panel.add_log_entry("Criando LCD para teste...")
-                lcd = LCD16x2Widget()
-                self.work_area.add_component(lcd, QPoint(300, 50))
-                self.lcd_widget = lcd
-                self.status_panel.add_log_entry("LCD criado e adicionado")
-            else:
-                self.lcd_widget = lcd_widgets[0]
-                self.status_panel.add_log_entry(f"Usando LCD existente: {self.lcd_widget}")
-
-            # Teste 1: Texto simples
-            self.status_panel.add_log_entry("TESTE 1: Definindo texto simples...")
-            self.lcd_widget.set_display_text("HELLO WORLD!", "TEST DIRECT LCD")
-            self.lcd_widget.set_display_on(True)
-            self.lcd_widget.update()
-            self.status_panel.add_log_entry("TESTE 1: Texto definido")
-
-            # Teste 2: Verificar propriedades
-            self.status_panel.add_log_entry("TESTE 2: Verificando propriedades...")
-            self.status_panel.add_log_entry(f"LCD visível: {self.lcd_widget.isVisible()}")
-            self.status_panel.add_log_entry(f"LCD size: {self.lcd_widget.size()}")
-            self.status_panel.add_log_entry(f"LCD display_on: {self.lcd_widget.display_on}")
-            self.status_panel.add_log_entry(f"LCD display_text: {self.lcd_widget.display_text}")
-
-            # Teste 3: Forçar repaint
-            self.status_panel.add_log_entry("TESTE 3: Forçando repaint...")
-            self.lcd_widget.repaint()
-
-            # Teste 4: Verificar core do emulador
-            self.status_panel.add_log_entry("TESTE 4: Verificando core do emulador...")
-            if self.core:
-                lcd_state = self.core.get_lcd_state()
-                self.status_panel.add_log_entry(f"Core LCD state: display_on={lcd_state.display_on}")
-                self.status_panel.add_log_entry(f"Core LCD display: {[hex(b) for b in lcd_state.display[:20]]}")
-
-                # Chamar update_lcd_display com o estado do core
-                self.update_lcd_display(lcd_state)
-
-            self.status_panel.add_log_entry("=== FIM DO TESTE LCD ===")
-
-        except Exception as e:
-            self.status_panel.add_log_entry(f"ERRO no teste LCD: {e}")
-            import traceback
-            self.status_panel.add_log_entry(f"Traceback: {traceback.format_exc()}")
-
 def main():
     """Função principal"""
     app = QApplication(sys.argv)
@@ -1163,10 +1167,24 @@ def main():
 
     # Criar e mostrar janela principal
     window = Emu65MainWindow()
+    window.app = app  # Adicionar referência da aplicação para cleanup
     window.show()
 
     # Executar aplicação
-    sys.exit(app.exec())
+    try:
+        exit_code = app.exec()
+    except Exception as e:
+        print(f"Erro durante execução da aplicação: {e}")
+        exit_code = 1
+    finally:
+        # Cleanup final forçado
+        try:
+            if hasattr(window, 'core') and window.core:
+                window.core.destroy()
+        except:
+            pass
+
+    sys.exit(exit_code)
 
 if __name__ == "__main__":
     main()

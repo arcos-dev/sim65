@@ -25,22 +25,22 @@ class Programs6502:
 
             # Function Set (8-bit, 2 lines, 5x8 font)
             "A9 38 8D 00 60"  # LDA #$38, STA $6000 (PORTB = 0x38)
-            "A9 20 8D 01 60"  # LDA #$20, STA $6001 (PORTA = RS=0, RW=0, E=1)
+            "A9 80 8D 01 60"  # LDA #$80, STA $6001 (PORTA = RS=0, RW=0, E=1)
             "A9 00 8D 01 60"  # LDA #$00, STA $6001 (PORTA = RS=0, RW=0, E=0)
 
             # Display ON/OFF (display on, cursor off, blink off)
             "A9 0C 8D 00 60"  # LDA #$0C, STA $6000 (PORTB = 0x0C)
-            "A9 20 8D 01 60"  # LDA #$20, STA $6001 (PORTA = RS=0, RW=0, E=1)
+            "A9 80 8D 01 60"  # LDA #$80, STA $6001 (PORTA = RS=0, RW=0, E=1)
             "A9 00 8D 01 60"  # LDA #$00, STA $6001 (PORTA = RS=0, RW=0, E=0)
 
             # Clear Display
             "A9 01 8D 00 60"  # LDA #$01, STA $6000 (PORTB = 0x01)
-            "A9 20 8D 01 60"  # LDA #$20, STA $6001 (PORTA = RS=0, RW=0, E=1)
+            "A9 80 8D 01 60"  # LDA #$80, STA $6001 (PORTA = RS=0, RW=0, E=1)
             "A9 00 8D 01 60"  # LDA #$00, STA $6001 (PORTA = RS=0, RW=0, E=0)
 
             # Entry Mode Set (increment cursor, no shift)
             "A9 06 8D 00 60"  # LDA #$06, STA $6000 (PORTB = 0x06)
-            "A9 20 8D 01 60"  # LDA #$20, STA $6001 (PORTA = RS=0, RW=0, E=1)
+            "A9 80 8D 01 60"  # LDA #$80, STA $6001 (PORTA = RS=0, RW=0, E=1)
             "A9 00 8D 01 60"  # LDA #$00, STA $6001 (PORTA = RS=0, RW=0, E=0)
         )
 
@@ -49,8 +49,8 @@ class Programs6502:
         """Retorna o código para escrever um caractere no LCD"""
         return bytes.fromhex(
             f"A9 {char_code:02X} 8D 00 60"  # LDA #$char, STA $6000 (PORTB = char)
-            "A9 60 8D 01 60"                # LDA #$60, STA $6001 (RS=1, E=1)
-            "A9 40 8D 01 60"                # LDA #$40, STA $6001 (RS=1, E=0)
+            "A9 A0 8D 01 60"                # LDA #$A0, STA $6001 (RS=1, E=1) = 0x20 + 0x80
+            "A9 20 8D 01 60"                # LDA #$20, STA $6001 (RS=1, E=0) = 0x20
         )
 
     @staticmethod

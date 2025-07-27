@@ -6,7 +6,15 @@
  * com a interface Python existente.
  *
  * Esta implementação segue a arquitetura do sim65 usando bus_init,
- * cpu6502_init, via_init, etc.
+ * cpu6502_ini        // PORTA (0x6001) - controle do LCD (Ben Eater style)
+        if (address == 0x6001) {
+            bool rs = (value & 0x20) != 0;  // RS bit (PA5)
+            bool rw = (value & 0x40) != 0;  // RW bit (PA6)
+            bool e = (value & 0x80) != 0;   // Enable bit (PA7)
+
+            // Estado anterior do Enable
+            bool prev_e = (last_porta_control & 0x80) != 0;
+            bool e_falling_edge = prev_e && !e;  // Borda de descida do Enable.
  *
  * Autor: Anderson Costa
  * Data: 2025-01-21
@@ -47,6 +55,10 @@ typedef struct {
     // Callback para interceptar escritas
     void (*write_callback)(struct emu6502_context* ctx, uint16_t address, uint8_t value);
 } emu6502_context_t;
+
+// Ponteiro global para o contexto ativo (para callbacks de bus)
+// Global context for tracking active emulator instance
+static emu6502_context_t* g_active_context = NULL;
 
 // Função auxiliar para inicializar o LCD state
 static void init_lcd_state(lcd_16x2_state_t* lcd) {
@@ -168,6 +180,10 @@ EMU6502_API int emu6502_init(void* emu) {
     }
 
     ctx->initialized = true;
+
+    // Configurar o contexto ativo para monitoramento de bus
+    g_active_context = ctx;
+
     return 0;
 }
 
@@ -200,7 +216,90 @@ EMU6502_API int emu6502_step(void* emu) {
         return -1;
     }
 
-    return cpu6502_step();
+    // Capturar estado antes da execução
+    cpu_state_t prev_state;
+    emu6502_get_cpu_state(emu, &prev_state);
+
+    // Capturar estado VIA antes da execução para detectar mudanças
+    uint8_t prev_portb = 0;
+    uint8_t prev_porta = 0;
+    if (ctx->via) {
+        prev_portb = bus_read_memory(&ctx->bus, 0x6000);  // VIA PORTB
+        prev_porta = bus_read_memory(&ctx->bus, 0x6001);  // VIA PORTA
+    }
+
+    // Executar a instrução
+    int result = cpu6502_step();
+
+    // Capturar estado após a execução
+    cpu_state_t curr_state;
+    emu6502_get_cpu_state(emu, &curr_state);
+
+    // Verificar mudanças VIA após execução e processar LCD
+    if (ctx->via) {
+        uint8_t curr_portb = bus_read_memory(&ctx->bus, 0x6000);  // VIA PORTB
+        uint8_t curr_porta = bus_read_memory(&ctx->bus, 0x6001);  // VIA PORTA
+
+        // Se houve mudança nos registros VIA, processar como operação LCD
+        if (curr_porta != prev_porta || curr_portb != prev_portb) {
+            // Simular a mesma lógica do emu6502_write_byte para VIA
+            bool rs = (curr_porta & 0x20) != 0;  // RS bit (PA5)
+            bool rw = (curr_porta & 0x40) != 0;  // RW bit (PA6)
+            bool e = (curr_porta & 0x80) != 0;   // Enable bit (PA7)
+
+            // Detectar borda de descida do Enable
+            bool prev_e = (prev_porta & 0x80) != 0;
+            bool e_falling_edge = prev_e && !e;
+
+            // Processar LCD na borda de descida do Enable
+            if (e_falling_edge && !rw) {
+                if (rs) {
+                    // RS=1: Dados (escrever caractere)
+                    if (curr_portb >= 32 && curr_portb < 127) {
+                        emu6502_lcd_write_char(emu, curr_portb);
+                    }
+                } else {
+                    // RS=0: Comando
+                    lcd_16x2_state_t* lcd = &ctx->lcd_state;
+
+                    if (curr_portb == 0x01) {
+                        // Clear Display
+                        emu6502_lcd_clear(emu);
+                    } else if ((curr_portb & 0xF8) == 0x38) {
+                        // Function Set (0x38 = 8-bit, 2 line, 5x8 dots)
+                        lcd->function_set = curr_portb;
+                    } else if ((curr_portb & 0xF8) == 0x08) {
+                        // Display On/Off Control (0x08-0x0F)
+                        lcd->display_control = curr_portb;
+                        lcd->display_on = (curr_portb & 0x04) != 0;
+                        lcd->cursor_on = (curr_portb & 0x02) != 0;
+                        lcd->blink_on = (curr_portb & 0x01) != 0;
+                    } else if ((curr_portb & 0xFC) == 0x04) {
+                        // Entry Mode Set (0x04-0x07)
+                        lcd->entry_mode = curr_portb;
+                    } else if ((curr_portb & 0x80) == 0x80) {
+                        // Set DDRAM Address (0x80-0xFF)
+                        uint8_t addr = curr_portb & 0x7F;
+                        if (addr < 0x40) {
+                            lcd->cursor_row = 0;
+                            lcd->cursor_col = addr;
+                        } else if (addr >= 0x40 && addr < 0x40 + 16) {
+                            lcd->cursor_row = 1;
+                            lcd->cursor_col = addr - 0x40;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Simular captura de barramento baseado na mudança de PC
+    // Isto é uma simplificação - operações reais de barramento seriam mais complexas
+    ctx->last_bus_state.address = curr_state.pc;
+    ctx->last_bus_state.data = 0x00; // Não temos o dado exato, mas PC mudou
+    ctx->last_bus_state.rw = true; // Assume leitura de instrução
+
+    return result;
 }
 
 EMU6502_API int emu6502_run_cycles(void* emu, uint32_t cycles) {
@@ -286,59 +385,106 @@ EMU6502_API void emu6502_write_byte(void* emu, uint16_t address, uint8_t value) 
         return;
     }
 
-    // Interceptar escritas no VIA para LCD
+    // Atualizar o estado do barramento para captura
+    ctx->last_bus_state.address = address;
+    ctx->last_bus_state.data = value;
+    ctx->last_bus_state.rw = false; // Write operation    // Interceptar escritas no VIA para LCD
     if (address >= 0x6000 && address <= 0x600F) {
-        static uint8_t last_porta_data = 0;  // Valor escrito no PORTA (dados LCD)
-
-        printf("VIA Write: address=0x%04X, value=0x%02X\n", address, value);
-        fflush(stdout);
+        static uint8_t last_portb_data = 0;  // Valor escrito no PORTB (dados LCD)
+        static uint8_t last_porta_control = 0;  // Estado anterior do PORTA para detectar mudanças
 
         // Fazer a escrita no bus primeiro
         bus_write_memory(&ctx->bus, address, value);
 
-        // PORTA (0x6001) - dados do LCD (Ben Eater style)
-        if (address == 0x6001) {
-            last_porta_data = value;
-            printf("LCD Data stored (PORTA): 0x%02X ('%c')\n", value,
-                   (value >= 32 && value < 127) ? value : '?');
-            fflush(stdout);
+        // PORTB (0x6000) - dados do LCD (Ben Eater style)
+        if (address == 0x6000) {
+            last_portb_data = value;
         }
 
-        // PORTB (0x6000) - controle do LCD (Ben Eater style)
-        if (address == 0x6000) {
-            printf("LCD Control (PORTB): 0x%02X\n", value);
-            fflush(stdout);
-            bool rs = value & 0x01;  // RS bit (PB0)
-            bool e = value & 0x02;   // Enable bit (PB1)
-            bool rw = value & 0x04;  // RW bit (PB2)
-
-            printf("Control bits: RS=%d, E=%d, RW=%d\n", rs, e, rw);
+        // PORTA (0x6001) - controle do LCD (Ben Eater style)
+        if (address == 0x6001) {
+            printf("[ANDERSON DEBUG] PORTA = 0x%02X, E=%d, RS=%d\n",
+                   value,
+                   (value & 0x80) ? 1 : 0,  // E bit (PA7)
+                   (value & 0x20) ? 1 : 0   // RS bit (PA5)
+            );
             fflush(stdout);
 
-            // Quando Enable vai para alto e não é leitura
-            if (e && !rw) {
-                printf("LCD Data from stored PORTA: 0x%02X ('%c')\n", last_porta_data,
-                       (last_porta_data >= 32 && last_porta_data < 127) ? last_porta_data : '?');
+            bool rs = (value & 0x20) != 0;  // RS bit (PA5)
+            bool rw = (value & 0x40) != 0;  // RW bit (PA6)
+            bool e = (value & 0x80) != 0;   // Enable bit (PA7)
+
+            // Estado anterior do Enable
+            bool prev_e = (last_porta_control & 0x80) != 0;
+            bool e_falling_edge = prev_e && !e;  // Borda de descida do Enable            printf("Control bits: RS=%d, E=%d, RW=%d\n", rs, e, rw);
+            fflush(stdout);
+
+            // Processa comandos na borda de descida do Enable
+            if (e_falling_edge && !rw) {
+                printf("LCD Data from PORTB: 0x%02X ('%c')\n", last_portb_data,
+                       (last_portb_data >= 32 && last_portb_data < 127) ? last_portb_data : '?');
                 fflush(stdout);
 
                 if (rs) {
                     // RS=1: Dados (escrever caractere)
-                    if (last_porta_data >= 32 && last_porta_data < 127) {
-                        emu6502_lcd_write_char(emu, last_porta_data);
-                        printf("LCD: Caractere '%c' escrito no display\n", last_porta_data);
+                    if (last_portb_data >= 32 && last_portb_data < 127) {
+                        emu6502_lcd_write_char(emu, last_portb_data);
+                        printf("LCD: Caractere '%c' escrito no display\n", last_portb_data);
                         fflush(stdout);
                     }
                 } else {
                     // RS=0: Comando
-                    printf("LCD: Comando 0x%02X\n", last_porta_data);
+                    printf("LCD: Comando 0x%02X\n", last_portb_data);
                     fflush(stdout);
-                    if (last_porta_data == 0x01) {
+
+                    emu6502_context_t* ctx = (emu6502_context_t*)emu;
+                    lcd_16x2_state_t* lcd = &ctx->lcd_state;
+
+                    if (last_portb_data == 0x01) {
+                        // Clear Display
                         emu6502_lcd_clear(emu);
                         printf("LCD: Display limpo\n");
+                        fflush(stdout);
+                    } else if ((last_portb_data & 0xF8) == 0x38) {
+                        // Function Set (0x38 = 8-bit, 2 line, 5x8 dots)
+                        lcd->function_set = last_portb_data;
+                        printf("LCD: Function Set 0x%02X configurado\n", last_portb_data);
+                        fflush(stdout);
+                    } else if ((last_portb_data & 0xF8) == 0x08) {
+                        // Display On/Off Control (0x08-0x0F)
+                        lcd->display_control = last_portb_data;
+                        lcd->display_on = (last_portb_data & 0x04) != 0;
+                        lcd->cursor_on = (last_portb_data & 0x02) != 0;
+                        lcd->blink_on = (last_portb_data & 0x01) != 0;
+                        printf("LCD: Display Control 0x%02X - ON:%d, CURSOR:%d, BLINK:%d\n",
+                               last_portb_data, lcd->display_on, lcd->cursor_on, lcd->blink_on);
+                        fflush(stdout);
+                    } else if ((last_portb_data & 0xFC) == 0x04) {
+                        // Entry Mode Set (0x04-0x07)
+                        lcd->entry_mode = last_portb_data;
+                        printf("LCD: Entry Mode 0x%02X configurado\n", last_portb_data);
+                        fflush(stdout);
+                    } else if ((last_portb_data & 0x80) == 0x80) {
+                        // Set DDRAM Address (0x80-0xFF)
+                        uint8_t addr = last_portb_data & 0x7F;
+                        if (addr < 0x40) {
+                            lcd->cursor_row = 0;
+                            lcd->cursor_col = addr;
+                        } else if (addr >= 0x40 && addr < 0x40 + 16) {
+                            lcd->cursor_row = 1;
+                            lcd->cursor_col = addr - 0x40;
+                        }
+                        printf("LCD: Set cursor to row=%d, col=%d (addr=0x%02X)\n",
+                               lcd->cursor_row, lcd->cursor_col, addr);
+                        fflush(stdout);
+                    } else {
+                        printf("LCD: Comando não implementado: 0x%02X\n", last_portb_data);
                         fflush(stdout);
                     }
                 }
             }
+
+            last_porta_control = value;  // Salva estado atual para próxima comparação
         }
 
         return; // Já fizemos a escrita

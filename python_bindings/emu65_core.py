@@ -265,20 +265,24 @@ class Emu65Core:
         return self._lib.emu6502_read_byte(self._core, address)
 
     def destroy(self):
-        """Destrói o core e libera recursos"""
+        """Destrói o core e libera recursos de forma eficiente"""
         if hasattr(self, '_core') and self._core and hasattr(self, '_lib') and self._lib:
             try:
                 # Verificar se a função ainda existe na DLL
                 if hasattr(self._lib, 'emu6502_destroy'):
                     self._lib.emu6502_destroy(self._core)
-            except (OSError, AttributeError, SystemError):
+                    print("[DEBUG] Core destruído com sucesso")
+            except (OSError, AttributeError, SystemError) as e:
                 # DLL pode ter sido descarregada ou função não disponível
+                print(f"[DEBUG] Erro esperado durante cleanup: {e}")
                 pass
-            except Exception:
+            except Exception as e:
                 # Qualquer outro erro durante cleanup
+                print(f"[DEBUG] Erro inesperado durante cleanup: {e}")
                 pass
             finally:
                 self._core = None
+                self._lib = None  # Limpar referência da biblioteca também
 
     # Removido __del__ para evitar problemas durante shutdown do Python
 

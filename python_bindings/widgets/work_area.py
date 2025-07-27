@@ -69,7 +69,7 @@ class WorkAreaWidget(QFrame):
 
         self.components.append(component)
         self.next_component_id += 1
-        
+
         widget.setParent(self)
         widget.move(pos)
         widget.show()
@@ -112,7 +112,7 @@ class WorkAreaWidget(QFrame):
                 widget = comp['widget']
                 if not widget or not widget.isVisible():
                     continue
-                    
+
                 rect = QRect(comp['pos'], widget.size())
 
                 if rect.contains(event.pos()):
@@ -135,7 +135,7 @@ class WorkAreaWidget(QFrame):
                 widget = comp['widget']
                 if not widget or not widget.isVisible():
                     continue
-                    
+
                 rect = QRect(comp['pos'], widget.size())
 
                 if rect.contains(event.pos()):
@@ -175,12 +175,12 @@ class WorkAreaWidget(QFrame):
         if self.dragging:
             component_id, offset, start_pos = self.dragging
             comp = self.get_component_by_id(component_id)
-            
+
             if not comp or not comp['widget']:
                 self.dragging = None
                 self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
                 return
-                
+
             new_pos = event.pos() - offset
 
             # Snap ao grid se ativado
@@ -200,12 +200,12 @@ class WorkAreaWidget(QFrame):
         elif self.rotating:
             component_id, start_angle = self.rotating
             comp = self.get_component_by_id(component_id)
-            
+
             if not comp or not comp['widget']:
                 self.rotating = None
                 self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
                 return
-                
+
             # Calcular ângulo baseado na posição do mouse
             center = comp['pos'] + QPoint(comp['widget'].width() // 2, comp['widget'].height() // 2)
             angle = self.calculate_rotation_angle(center, event.pos())
@@ -237,7 +237,7 @@ class WorkAreaWidget(QFrame):
         if self.dragging:
             component_id, offset, start_pos = self.dragging
             comp = self.get_component_by_id(component_id)
-            
+
             if comp:
                 final_pos = comp['pos']
 
@@ -251,7 +251,7 @@ class WorkAreaWidget(QFrame):
         elif self.rotating:
             component_id, start_angle = self.rotating
             comp = self.get_component_by_id(component_id)
-            
+
             if comp:
                 final_angle = comp['rotation']
 
@@ -300,12 +300,25 @@ class WorkAreaWidget(QFrame):
         self.update()
 
     def clear_components(self):
-        """Remove todos os componentes da área de trabalho"""
+        """Remove todos os componentes da área de trabalho com cleanup completo"""
+        # Parar timer de rotação se estiver ativo
+        if hasattr(self, 'rotation_timer') and self.rotation_timer and self.rotation_timer.isActive():
+            self.rotation_timer.stop()
+
+        # Limpar componentes
         for comp in self.components:
             if comp['widget']:
+                # Cleanup específico para widgets LCD
+                if hasattr(comp['widget'], 'cleanup'):
+                    try:
+                        comp['widget'].cleanup()
+                    except Exception as e:
+                        print(f"Erro no cleanup do componente: {e}")
+
+                # Remover widget
                 comp['widget'].setParent(None)
                 comp['widget'].deleteLater()
-        
+
         self.components.clear()
         self.next_component_id = 1
         self.dragging = None
