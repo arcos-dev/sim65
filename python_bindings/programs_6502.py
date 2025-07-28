@@ -588,13 +588,12 @@ class Programs6502:
                     print(f"Erro ao carregar {example['file']}: {e}")
                     continue
 
-        # Se não encontrou nenhum exemplo, usar programas gerados
-        if not programs:
-            print("Nenhum exemplo Ben Eater encontrado, usando programas gerados")
-            programs = [
-                Programs6502.hello_world(),
-                Programs6502.counter(),
-                Programs6502.math_demo()
-            ]
+        # Adicionar programas gerados sempre (além dos exemplos Ben Eater)
+        print("Adicionando programas gerados")
+        programs.extend([
+            Programs6502.hello_world(),
+            Programs6502.counter(),
+            Programs6502.math_demo()
+        ])
 
         return programs

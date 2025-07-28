@@ -4,8 +4,17 @@
 # Compila a biblioteca compartilhada que conecta o emulador sim65
 # com a interface Python existente.
 #
+# IMPORTANTE: A partir da versão 2.1.0 (2025-01-27):
+# - A DLL e .lib são automaticamente copiadas para ../lib/
+# - Não há mais duplicação de arquivos no diretório python_bindings
+# - O Python carrega a biblioteca do diretório centralizado ../lib/
+#
+# Estrutura de saída:
+# - ../lib/emu6502.dll: Biblioteca principal
+# - ../lib/emu6502.lib: Biblioteca de importação (Windows)
+#
 # Autor: Anderson Costa
-# Data: 2025-01-21
+# Data: 2025-01-27
 
 # Configuração do compilador
 CC = gcc
@@ -82,6 +91,17 @@ $(LIB_DIR)/$(TARGET): $(ALL_OBJECTS)
 	$(CC) $(LDFLAGS) -o $(TARGET) $(ALL_OBJECTS)
 	@echo "Installing $(TARGET) to $(LIB_DIR)..."
 	@cp $(TARGET) $(LIB_DIR)/
+ifeq ($(OS),Windows_NT)
+	@echo "Installing emu6502.lib to $(LIB_DIR)..."
+	@cp emu6502.lib $(LIB_DIR)/ 2>/dev/null || true
+else
+    # Detectar Windows via uname ou forçar
+    UNAME_S := $(shell uname -s 2>/dev/null || echo "Windows")
+    ifneq ($(findstring Windows,$(UNAME_S)),)
+	@echo "Installing emu6502.lib to $(LIB_DIR)..."
+	@cp emu6502.lib $(LIB_DIR)/ 2>/dev/null || true
+    endif
+endif
 	@echo "Build completed: $(LIB_DIR)/$(TARGET)"
 
 # Compilar arquivos da API
@@ -124,6 +144,7 @@ clean:
 	rm -f $(CLEAN_FILES)
 	rm -rf $(BUILD_DIR)
 	rm -f $(LIB_DIR)/$(TARGET)
+	rm -f $(LIB_DIR)/emu6502.lib 2>/dev/null || true
 	@echo "Clean completed."
 
 # Instalar (já incluído no target principal)
