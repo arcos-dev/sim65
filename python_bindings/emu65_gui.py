@@ -378,6 +378,12 @@ class Emu65MainWindow(QMainWindow):
                 load_action.triggered.connect(self.load_rom)
                 file_menu.addAction(load_action)
 
+                # Ação Carregar Exemplo
+                load_example_action = QAction("Carregar &Exemplo...", self)
+                load_example_action.setShortcut("Ctrl+E")
+                load_example_action.triggered.connect(self.load_example)
+                file_menu.addAction(load_example_action)
+
                 file_menu.addSeparator()
 
                 # Ação Sair
@@ -495,7 +501,6 @@ class Emu65MainWindow(QMainWindow):
         """Handler para step"""
         if self.core:
             try:
-                self.status_panel.add_log_entry(f"DEBUG: Executando step {self.cycle_count + 1}")
                 result = self.core.step()
                 self.cycle_count += 1
                 self.instruction_count += 1
@@ -506,22 +511,17 @@ class Emu65MainWindow(QMainWindow):
                     bus_state.address, bus_state.data, bus_state.rw
                 )
 
-                # DEBUG: Log antes de atualizar LCD
-                self.status_panel.add_log_entry(f"DEBUG: Obtendo estado do LCD...")
-
                 # Atualizar LCD - sempre verificar mudanças
                 lcd_state = self.core.get_lcd_state()
-                self.status_panel.add_log_entry(f"DEBUG: Estado LCD obtido, chamando update_lcd_display...")
                 self.update_lcd_display(lcd_state)
 
                 # Atualizar status da interface
                 self.update_status()
 
-                # Log de debug para endereços de I/O
-                if 0x6000 <= bus_state.address <= 0x6003:
+                # Log de debug para endereços de I/O (apenas quando interessante)
+                if 0x6000 <= bus_state.address <= 0x6003 and not bus_state.rw:
                     self.status_panel.add_log_entry(
-                        f"I/O: addr=0x{bus_state.address:04X} data=0x{bus_state.data:02X} "
-                        f"rw={'R' if bus_state.rw else 'W'}"
+                        f"I/O Write: addr=0x{bus_state.address:04X} data=0x{bus_state.data:02X}"
                     )
 
             except Exception as e:
@@ -588,40 +588,19 @@ class Emu65MainWindow(QMainWindow):
     def update_lcd_display(self, lcd_state):
         """Atualiza o display LCD"""
         try:
-            # DEBUG: Log do estado recebido
-            self.status_panel.add_log_entry(f"DEBUG: update_lcd_display chamado, lcd_state existe: {lcd_state is not None}")
-
             if not self.lcd_widget:
                 # Procurar por widget LCD na área de trabalho se não estiver definido
                 lcd_widgets = self.work_area.findChildren(LCD16x2Widget)
-                self.status_panel.add_log_entry(f"DEBUG: Encontrados {len(lcd_widgets)} widgets LCD")
                 for widget in lcd_widgets:
                     self.lcd_widget = widget
-                    self.status_panel.add_log_entry(f"DEBUG: LCD widget definido: {widget}")
                     break
 
-            if not self.lcd_widget:
-                self.status_panel.add_log_entry("DEBUG: Nenhum widget LCD encontrado!")
+            if not self.lcd_widget or lcd_state is None:
                 return
-
-            if lcd_state is None:
-                self.status_panel.add_log_entry("DEBUG: lcd_state é None!")
-                return
-
-            # DEBUG: Log dos dados brutos
-            display_raw = lcd_state.display
-            self.status_panel.add_log_entry(f"DEBUG: LCD display raw length: {len(display_raw)}")
-            self.status_panel.add_log_entry(f"DEBUG: LCD display raw bytes: {[hex(b) for b in display_raw[:20]]}")
 
             # Converte o array de bytes para string
-            display_bytes = bytes(display_raw)
+            display_bytes = bytes(lcd_state.display)
             display_text = display_bytes.decode('ascii', errors='replace')
-            self.status_panel.add_log_entry(f"DEBUG: LCD display text: '{display_text[:32]}' (total: {len(display_text)} chars)")
-
-            # DEBUG: Estados importantes do LCD
-            self.status_panel.add_log_entry(f"DEBUG: LCD Estados - display_on={lcd_state.display_on}, cursor_on={lcd_state.cursor_on}, blink_on={lcd_state.blink_on}")
-            self.status_panel.add_log_entry(f"DEBUG: LCD Cursor - row={lcd_state.cursor_row}, col={lcd_state.cursor_col}")
-            self.status_panel.add_log_entry(f"DEBUG: LCD Busy={lcd_state.busy}, function_set=0x{lcd_state.function_set:02X}")
 
             # O formato no C é: display[2][17] - 2 linhas de 16 chars + null terminator
             # Então temos 34 bytes total: linha1 (17 bytes) + linha2 (17 bytes)
@@ -647,8 +626,6 @@ class Emu65MainWindow(QMainWindow):
                 row1 = display_text[:16] if len(display_text) >= 16 else ""
                 row2 = display_text[16:32] if len(display_text) >= 32 else ""
 
-            self.status_panel.add_log_entry(f"DEBUG: Rows extraídas - row1: '{row1}', row2: '{row2}'")
-
             # IMPORTANTE: Só atualizar se há mudança real ou se display está ligado
             current_text_row1 = self.lcd_widget.display_text[0].strip() if self.lcd_widget.display_text else ""
             current_text_row2 = self.lcd_widget.display_text[1].strip() if self.lcd_widget.display_text else ""
@@ -666,10 +643,9 @@ class Emu65MainWindow(QMainWindow):
                 # Forçar repaint do widget
                 self.lcd_widget.update()
 
-                # Log da mudança
-                self.status_panel.add_log_entry(f"LCD MUDANÇA DETECTADA: '{row1}' | '{row2}' (ON:{lcd_state.display_on}, CURSOR:{lcd_state.cursor_on}, BLINK:{lcd_state.blink_on})")
-            else:
-                self.status_panel.add_log_entry(f"LCD SEM MUDANÇA: '{row1}' | '{row2}' (ON:{lcd_state.display_on})")
+                # Log da mudança (apenas quando há mudança significativa)
+                if row1.strip() or row2.strip():
+                    self.status_panel.add_log_entry(f"LCD: '{row1}' | '{row2}'")
 
         except Exception as e:
             self.status_panel.add_log_entry(f"Erro ao atualizar LCD: {e}")
@@ -766,34 +742,14 @@ class Emu65MainWindow(QMainWindow):
 
                     # TESTE: Verificar se LCD foi adicionado e testar funcionamento
                     if 'LCD 16x2' in selected_example.get('components', []):
-                        self.status_panel.add_log_entry("DEBUG: Verificando LCD após carregar componentes...")
                         lcd_state = self.core.get_lcd_state()
                         self.update_lcd_display(lcd_state)
-
-                        # Verificar se LCD widget foi criado corretamente
-                        if self.lcd_widget:
-                            self.status_panel.add_log_entry(f"DEBUG: LCD widget válido: {self.lcd_widget}")
-                            self.status_panel.add_log_entry(f"DEBUG: LCD widget visível: {self.lcd_widget.isVisible()}")
-                            self.status_panel.add_log_entry(f"DEBUG: LCD widget size: {self.lcd_widget.size()}")
-                            self.status_panel.add_log_entry(f"DEBUG: LCD widget parent: {self.lcd_widget.parent()}")
-                        else:
-                            self.status_panel.add_log_entry("DEBUG: LCD widget não encontrado!")
-
-                        # Verificar estado inicial do LCD no core
-                        try:
-                            lcd_state_after = self.core.get_lcd_state()
-                            self.status_panel.add_log_entry(f"DEBUG: Estado do LCD no core: display_on={lcd_state_after.display_on}")
-                            self.status_panel.add_log_entry(f"DEBUG: LCD display inicial: {[hex(b) for b in lcd_state_after.display[:16]]}")
-                        except Exception as e:
-                            self.status_panel.add_log_entry(f"ERRO ao verificar estado do LCD: {e}")
 
                     # Atualizar status
                     self.update_status()
                     # Logs
                     self.status_panel.add_log_entry(f"Exemplo carregado: {selected_example['name']}")
-                    self.status_panel.add_log_entry(f"Descrição: {selected_example['description']}")
                     self.status_panel.add_log_entry(f"Endereço inicial: 0x{selected_example['start_address']:04X}")
-                    self.status_panel.add_log_entry(f"Tamanho do binário: {len(selected_example['binary'])} bytes")
                     # Mensagem de sucesso
                     QMessageBox.information(
                         self,
@@ -898,35 +854,16 @@ class Emu65MainWindow(QMainWindow):
             # 5. Salvar configurações
             self.save_settings()
 
-            # 6. Destruir core do emulador (com timeout)
+            # 6. Destruir core do emulador (simplificado)
             if hasattr(self, 'core') and self.core:
                 try:
-                    # Usar QTimer.singleShot para timeout na destruição
-                    import threading
-
-                    def destroy_core():
-                        try:
-                            self.core.destroy()
-                        except Exception as e:
-                            print(f"Erro na destruição do core: {e}")
-
-                    # Executar destruição em thread separada com timeout
-                    destroy_thread = threading.Thread(target=destroy_core)
-                    destroy_thread.daemon = True  # Thread daemon para não bloquear o fechamento
-                    destroy_thread.start()
-                    destroy_thread.join(timeout=2.0)  # Timeout de 2 segundos
-
-                    if destroy_thread.is_alive():
-                        print("Warning: Core cleanup timeout - forçando fechamento")
-
+                    # Destruição simples sem threading
+                    self.core.destroy()
                 except Exception as e:
-                    print(f"Erro no cleanup do core: {e}")
+                    # Ignorar erros durante o fechamento
+                    pass
                 finally:
                     self.core = None
-
-            # 7. Forçar processamento de eventos pendentes
-            if hasattr(self, 'app') and self.app:
-                self.app.processEvents()
 
         except Exception as e:
             print(f"Erro durante closeEvent: {e}")
@@ -1069,7 +1006,8 @@ class Emu65MainWindow(QMainWindow):
                 LEDWidget = ChipWidget
                 SwitchWidget = ChipWidget
 
-            self.status_panel.add_log_entry(f"DEBUG: Adicionando componentes: {components}")
+            # Log único para todos os componentes
+            self.status_panel.add_log_entry(f"Adicionando componentes: {', '.join(components)}")
 
             positions = {
                 '6502 CPU': QPoint(50, 50),
@@ -1084,7 +1022,6 @@ class Emu65MainWindow(QMainWindow):
 
             for comp in components:
                 pos = positions.get(comp, QPoint(100, 100))
-                self.status_panel.add_log_entry(f"DEBUG: Criando componente: {comp} na posição {pos}")
 
                 # Cria o widget correto para cada componente
                 try:
@@ -1096,7 +1033,6 @@ class Emu65MainWindow(QMainWindow):
                             "D3", "D4", "D5", "D6", "D7", "R/W", "PHI2", "RES"
                         ]
                         widget = ChipWidget(name=comp, pin_names=pin_names)
-                        self.status_panel.add_log_entry(f"DEBUG: CPU widget criado: {widget}")
                     elif comp == 'RAM':
                         pin_names = [
                             "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
@@ -1104,7 +1040,6 @@ class Emu65MainWindow(QMainWindow):
                             "WE", "OE", "CS", "VCC", "GND"
                         ]
                         widget = ChipWidget(name=comp, pin_names=pin_names)
-                        self.status_panel.add_log_entry(f"DEBUG: RAM widget criado: {widget}")
                     elif comp == 'ROM':
                         pin_names = [
                             "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
@@ -1113,46 +1048,34 @@ class Emu65MainWindow(QMainWindow):
                             "OE", "CE", "VCC", "GND"
                         ]
                         widget = ChipWidget(name=comp, pin_names=pin_names)
-                        self.status_panel.add_log_entry(f"DEBUG: ROM widget criado: {widget}")
                     elif comp == 'Resistor' or comp == 'Capacitor':
                         widget = ChipWidget(name=comp)
-                        self.status_panel.add_log_entry(f"DEBUG: {comp} widget criado: {widget}")
                     elif comp == 'LCD 16x2':
                         widget = LCD16x2Widget()
                         self.lcd_widget = widget
-                        self.status_panel.add_log_entry(f"DEBUG: LCD widget criado e definido como self.lcd_widget: {widget}")
 
                         # LCD começa vazio - sem texto de teste
                         widget.set_display_text("", "")
                         widget.set_display_on(False)  # Começa desligado até ser inicializado pelo programa
                         widget.update()
-                        self.status_panel.add_log_entry("DEBUG: LCD inicializado vazio")
 
                     elif comp == 'LED':
                         widget = LEDWidget()
-                        self.status_panel.add_log_entry(f"DEBUG: LED widget criado: {widget}")
                     elif comp == 'Botão':
                         widget = SwitchWidget()
-                        self.status_panel.add_log_entry(f"DEBUG: Botão widget criado: {widget}")
                     else:
                         widget = ChipWidget(name=comp)
-                        self.status_panel.add_log_entry(f"DEBUG: Widget genérico criado para {comp}: {widget}")
 
                     self.work_area.add_component(widget, pos)
-                    self.status_panel.add_log_entry(f"DEBUG: Componente {comp} adicionado à work_area na posição {pos}")
 
                 except Exception as e:
-                    self.status_panel.add_log_entry(f"ERRO ao adicionar componente {comp}: {e}")
-                    import traceback
-                    self.status_panel.add_log_entry(f"Traceback: {traceback.format_exc()}")
+                    self.status_panel.add_log_entry(f"Erro ao criar {comp}: {e}")
                     # Fallback - adicionar como chip genérico
                     widget = ChipWidget(name=comp)
                     self.work_area.add_component(widget, pos)
 
         except Exception as e:
-            self.status_panel.add_log_entry(f"Erro geral ao adicionar componentes: {e}")
-            import traceback
-            self.status_panel.add_log_entry(f"Traceback: {traceback.format_exc()}")
+            self.status_panel.add_log_entry(f"Erro ao adicionar componentes: {e}")
 
 def main():
     """Função principal"""

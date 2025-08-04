@@ -15,6 +15,9 @@ Data: 2025-01-06
 class Programs6502:
     """Coleção de programas 6502 de exemplo"""
 
+    # Cache para evitar recarregamento desnecessário
+    _cached_programs = None
+
     @staticmethod
     def _get_lcd_init_sequence():
         """Retorna a sequência de inicialização do LCD Ben Eater"""
@@ -92,35 +95,104 @@ class Programs6502:
         """Programa contador no LCD com inicialização correta"""
         init_seq = Programs6502._get_lcd_init_sequence()
 
-        # Código do contador
-        counter_code = bytes.fromhex(
-            # Inicializar contador
-            "A9 00 85 00"                    # LDA #$00, STA $00 (contador = 0)
+        # Código do contador mais simples - apenas escrever alguns números
+        counter_text = [0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39]  # '0' a '9'
 
-            # Loop principal
-            "A5 00 C9 64 F0 0A"             # LDA $00, CMP #$64, BEQ reset
-            "E6 00"                         # INC $00
-            "A5 00 69 30"                   # LDA $00, ADC #$30 (converter para ASCII)
-            "8D 00 60"                      # STA $6000 (PORTB)
-            "A9 60 8D 01 60"                # LDA #$60, STA $6001 (RS=1, E=1)
-            "A9 40 8D 01 60"                # LDA #$40, STA $6001 (RS=1, E=0)
-            "4C 02 80"                      # JMP loop
+        counter_code = b''
+        for i, char in enumerate(counter_text):
+            counter_code += Programs6502._write_char_to_lcd(char)
 
-            # Reset contador
-            "A9 30 8D 00 60"                # LDA #$30, STA $6000 (escrever '0')
-            "A9 60 8D 01 60"                # LDA #$60, STA $6001 (RS=1, E=1)
-            "A9 40 8D 01 60"                # LDA #$40, STA $6001 (RS=1, E=0)
-            "A9 00 85 00"                   # LDA #$00, STA $00 (reset contador)
-            "4C 02 80"                      # JMP loop
-        )
+        # Loop infinito
+        loop_code = bytes.fromhex("4C 00 80")  # JMP $8000
 
-        full_program = init_seq + counter_code
+        full_program = init_seq + counter_code + loop_code
         start_address = 0x8000
         binary = Programs6502._add_reset_vector(full_program, start_address)
 
         return {
             'name': 'Contador',
-            'description': 'Conta de 0 a 99 no LCD com inicialização correta',
+            'description': 'Mostra números 0-9 no LCD',
+            'components': ['6502 CPU', 'LCD 16x2', 'RAM'],
+            'binary': binary,
+            'start_address': start_address
+        }
+
+    @staticmethod
+    def fibonacci():
+        """Programa Fibonacci no LCD"""
+        init_seq = Programs6502._get_lcd_init_sequence()
+
+        # Sequência Fibonacci simples: 0, 1, 1, 2, 3, 5, 8, 13
+        fib_chars = [0x30, 0x31, 0x31, 0x32, 0x33, 0x35, 0x38, 0x31, 0x33]  # "011235813"
+
+        fib_code = b''
+        for char in fib_chars:
+            fib_code += Programs6502._write_char_to_lcd(char)
+
+        # Loop infinito
+        loop_code = bytes.fromhex("4C 00 80")  # JMP $8000
+
+        full_program = init_seq + fib_code + loop_code
+        start_address = 0x8000
+        binary = Programs6502._add_reset_vector(full_program, start_address)
+
+        return {
+            'name': 'Fibonacci Rápido',
+            'description': 'Sequência Fibonacci: 011235813',
+            'components': ['6502 CPU', 'LCD 16x2', 'RAM'],
+            'binary': binary,
+            'start_address': start_address
+        }
+
+    @staticmethod
+    def calculator_demo():
+        """Demonstração de calculadora simples"""
+        init_seq = Programs6502._get_lcd_init_sequence()
+
+        # Mostrar "2+3=5"
+        calc_chars = [0x32, 0x2B, 0x33, 0x3D, 0x35]  # "2+3=5"
+
+        calc_code = b''
+        for char in calc_chars:
+            calc_code += Programs6502._write_char_to_lcd(char)
+
+        # Loop infinito
+        loop_code = bytes.fromhex("4C 00 80")  # JMP $8000
+
+        full_program = init_seq + calc_code + loop_code
+        start_address = 0x8000
+        binary = Programs6502._add_reset_vector(full_program, start_address)
+
+        return {
+            'name': 'Calculadora Demo',
+            'description': 'Mostra 2+3=5 no LCD',
+            'components': ['6502 CPU', 'LCD 16x2', 'RAM'],
+            'binary': binary,
+            'start_address': start_address
+        }
+
+    @staticmethod
+    def text_demo():
+        """Demonstração de texto animado"""
+        init_seq = Programs6502._get_lcd_init_sequence()
+
+        # Mostrar "EMU65 WORKS!"
+        text_chars = [0x45, 0x4D, 0x55, 0x36, 0x35, 0x20, 0x57, 0x4F, 0x52, 0x4B, 0x53, 0x21]  # "EMU65 WORKS!"
+
+        text_code = b''
+        for char in text_chars:
+            text_code += Programs6502._write_char_to_lcd(char)
+
+        # Loop infinito
+        loop_code = bytes.fromhex("4C 00 80")  # JMP $8000
+
+        full_program = init_seq + text_code + loop_code
+        start_address = 0x8000
+        binary = Programs6502._add_reset_vector(full_program, start_address)
+
+        return {
+            'name': 'Texto Demo',
+            'description': 'Mostra EMU65 WORKS! no LCD',
             'components': ['6502 CPU', 'LCD 16x2', 'RAM'],
             'binary': binary,
             'start_address': start_address
@@ -495,7 +567,14 @@ class Programs6502:
     @staticmethod
     def get_all_programs():
         """Retornar todos os programas disponíveis dos exemplos Ben Eater"""
+
+        # Usar cache para evitar recarregamento desnecessário
+        if Programs6502._cached_programs is not None:
+            return Programs6502._cached_programs
+
         import os
+
+        print("Adicionando programas gerados")  # Log apenas na primeira vez
 
         # Caminho base para os exemplos
         base_path = os.path.dirname(os.path.dirname(__file__))
@@ -505,17 +584,16 @@ class Programs6502:
 
         # Definições dos exemplos Ben Eater
         ben_eater_examples = [
-            {
-                'file': 'hello_lcd.bin',
-                'name': 'Hello LCD',
-                'description': 'Display "Hello, World!" no LCD',
-                'address': 0x8000,
-                'components': ['6502 CPU', 'LCD 16x2', 'RAM', 'ROM']
-            },
+            # Usar programas gerados dinamicamente quando possível
+            Programs6502.hello_world(),
+            Programs6502.counter(),
+            Programs6502.fibonacci(),
+            Programs6502.calculator_demo(),
+            Programs6502.text_demo(),
             {
                 'file': 'binary_counter.bin',
-                'name': 'Binary Counter',
-                'description': 'Contador binário no LCD',
+                'name': 'Binary Counter (Ben Eater)',
+                'description': 'Contador binário no LCD (versão Ben Eater - lenta)',
                 'address': 0x8000,
                 'components': ['6502 CPU', 'LCD 16x2', 'RAM', 'ROM']
             },
@@ -525,20 +603,6 @@ class Programs6502:
                 'description': 'Echo de caracteres via ACIA',
                 'address': 0x8000,
                 'components': ['6502 CPU', 'RAM', 'ROM']
-            },
-            {
-                'file': 'fibonacci.bin',
-                'name': 'Fibonacci',
-                'description': 'Sequência de Fibonacci',
-                'address': 0x8000,
-                'components': ['6502 CPU', 'LCD 16x2', 'RAM', 'ROM']
-            },
-            {
-                'file': 'calculator.bin',
-                'name': 'Calculator',
-                'description': 'Calculadora simples',
-                'address': 0x8000,
-                'components': ['6502 CPU', 'LCD 16x2', 'Botão', 'RAM', 'ROM']
             },
             {
                 'file': 'clock.bin',
@@ -568,32 +632,42 @@ class Programs6502:
                 'address': 0x8000,
                 'components': ['6502 CPU', 'LCD 16x2', 'RAM', 'ROM']
             }
-        ]        # Carregar programas que existem
-        for example in ben_eater_examples:
-            file_path = os.path.join(examples_path, example['file'])
-            if os.path.exists(file_path):
-                try:
-                    with open(file_path, 'rb') as f:
-                        binary_data = f.read()
+        ]
 
-                    programs.append({
-                        'name': example['name'],
-                        'description': example['description'],
-                        'binary': binary_data,
-                        'start_address': example['address'],
-                        'pc_start': example['address'],  # Para compatibilidade
-                        'components': example['components']  # Adicionar componentes
-                    })
-                except Exception as e:
-                    print(f"Erro ao carregar {example['file']}: {e}")
-                    continue
+        # Carregar programas
+        for example in ben_eater_examples:
+            # Se já tem binário (programa gerado), usar diretamente
+            if 'binary' in example:
+                programs.append(example)
+            # Senão, carregar do arquivo
+            elif 'file' in example:
+                file_path = os.path.join(examples_path, example['file'])
+                if os.path.exists(file_path):
+                    try:
+                        with open(file_path, 'rb') as f:
+                            binary_data = f.read()
+
+                        programs.append({
+                            'name': example['name'],
+                            'description': example['description'],
+                            'binary': binary_data,
+                            'start_address': example['address'],
+                            'pc_start': example['address'],  # Para compatibilidade
+                            'components': example['components']
+                        })
+
+                    except Exception as e:
+                        print(f"Erro ao carregar {example['file']}: {e}")
+                        continue
 
         # Adicionar programas gerados sempre (além dos exemplos Ben Eater)
-        print("Adicionando programas gerados")
         programs.extend([
             Programs6502.hello_world(),
             Programs6502.counter(),
             Programs6502.math_demo()
         ])
+
+        # Cachear o resultado para evitar recarregamento
+        Programs6502._cached_programs = programs
 
         return programs

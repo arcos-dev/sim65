@@ -61,3 +61,38 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "cpu: marca testes relacionados ao CPU"
     )
+    config.addinivalue_line(
+        "markers", "gui: marca testes de interface gráfica"
+    )
+    config.addinivalue_line(
+        "markers", "debug: marca testes de debug e depuração"
+    )
+
+@pytest.fixture
+def gui_app():
+    """Fixture para testes GUI com PyQt6"""
+    try:
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QTimer
+
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication([])
+
+        yield app
+
+        # Cleanup
+        QTimer.singleShot(0, app.quit)
+    except ImportError:
+        pytest.skip("PyQt6 não disponível")
+
+@pytest.fixture
+def main_window(gui_app):
+    """Fixture para criar janela principal da GUI"""
+    try:
+        from emu65_gui import Emu65MainWindow
+        window = Emu65MainWindow()
+        yield window
+        window.close()
+    except ImportError:
+        pytest.skip("GUI não disponível")

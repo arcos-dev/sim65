@@ -1,12 +1,12 @@
 # Testes EMU65 Python Bindings - Status Final ✅
 
 ## Resumo Geral
-**TODOS OS ERROS DO PYTEST FORAM CORRIGIDOS COM SUCESSO!**
+**TODOS OS TESTES ORGANIZADOS E FUNCIONANDO!**
 
-- ✅ **53 testes passando** (100% de sucesso)
-- ✅ **Todos os 12 exemplos da GUI validados** nos testes unitários
-- ✅ **Heap corruption resolvido** com context manager
-- ✅ **Cobertura completa** de funcionalidades
+- ✅ **56+ testes organizados** (incluindo novos testes GUI)
+- ✅ **Todos os exemplos validados** nos testes unitários
+- ✅ **Testes GUI adicionados** para interface gráfica
+- ✅ **Cobertura completa** de funcionalidades core e GUI
 
 ---
 
@@ -14,20 +14,23 @@
 
 ### Estatísticas
 ```
-Total de testes: 53
-✅ Passando: 53 (100%)
-❌ Falhando: 0 (0%)
-Tempo de execução: ~4 segundos
+Total de testes: 56+
+✅ Core/Emulador: 53 testes (100% passando)
+✅ Interface GUI: 12 novos testes
+⚡ Execução rápida com skip automático se PyQt6 indisponível
 ```
 
 ### Arquivos de Teste
 ```
 tests/
-├── conftest.py                    # Fixtures e configurações
+├── conftest.py                    # Fixtures e configurações (core + GUI)
 ├── test_all_programs.py          # ✅ 11 testes - Validação completa dos 12 programas
 ├── test_components.py             # ✅ 3 testes - Validação de componentes
 ├── test_enable_transitions.py     # ✅ 4 testes - Transições de sinais Enable
 ├── test_examples.py               # ✅ 5 testes - Estrutura dos exemplos
+├── test_gui_hello_world.py        # ✅ 4 testes - GUI Hello World
+├── test_gui_manual.py             # ✅ 4 testes - Simulação manual GUI
+├── test_gui_lcd_debug.py          # ✅ 4 testes - Debug LCD na GUI
 ├── test_lcd.py                    # ✅ 2 testes - Funcionalidade básica LCD
 ├── test_lcd_debug.py              # ✅ 3 testes - Debug detalhado LCD
 ├── test_lcd_final.py              # ✅ 5 testes - Testes finais LCD
@@ -279,6 +282,27 @@ Todos os erros do pytest foram corrigidos e todos os 12 exemplos da GUI estão s
 @pytest.mark.lcd           # Testes relacionados ao LCD
 @pytest.mark.via           # Testes relacionados ao VIA
 @pytest.mark.cpu           # Testes relacionados ao CPU
+@pytest.mark.gui           # Testes da interface gráfica
+@pytest.mark.debug         # Testes de debug e depuração
+```
+
+### Execução por Marcadores
+
+```bash
+# Todos os testes
+python -m pytest
+
+# Apenas testes GUI
+python -m pytest -m gui
+
+# Apenas testes de debug
+python -m pytest -m debug
+
+# Testes core (sem GUI)
+python -m pytest -m "not gui"
+
+# Testes rápidos (unitários)
+python -m pytest -m unit
 ```
 
 ### ✅ 4. Test Runner Personalizado

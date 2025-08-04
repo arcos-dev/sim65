@@ -259,7 +259,9 @@ class Emu65Core:
                     print(f"[DEBUG] PC set correctly on attempt {attempt+1}: 0x{cpu_state.pc:04X}")
                     break
                 else:
-                    print(f"[DEBUG] PC not set correctly on attempt {attempt+1}: expected {start_address:04X}, got {cpu_state.pc:04X}")
+                    # Só logar se é um erro persistente
+                    if attempt == 2:  # Última tentativa
+                        print(f"[DEBUG] PC not set correctly after {attempt+1} attempts: expected {start_address:04X}, got {cpu_state.pc:04X}")
 
                     # Se não é a última tentativa, continuar
                     if attempt < 2:
@@ -292,7 +294,6 @@ class Emu65Core:
         """Destrói o core e libera recursos de forma eficiente"""
         # Evitar múltiplas destruições
         if self._destroyed:
-            print("[DEBUG] Core já foi destruído, ignorando chamada adicional")
             return
 
         # Marcar como destruído primeiro
@@ -324,18 +325,16 @@ class Emu65Core:
             if hasattr(self, '_core') and self._core is not None:
                 if hasattr(self, '_lib') and self._lib is not None:
                     if hasattr(self._lib, 'emu6502_destroy'):
-                        print("[DEBUG] Destruindo core normalmente...")
                         destroy_func = self._lib.emu6502_destroy
                         destroy_func.restype = None
                         destroy_func.argtypes = [ctypes.c_void_p]
                         destroy_func(self._core)
-                        print("[DEBUG] Core destruído com sucesso")
-                    else:
-                        print("[DEBUG] Função emu6502_destroy não encontrada na DLL")
-                else:
-                    print("[DEBUG] Biblioteca não disponível para cleanup")
+                    # Removido print DEBUG sobre função não encontrada
+                # Removido print DEBUG sobre biblioteca não disponível
         except Exception as e:
-            print(f"[DEBUG] Erro durante destruição (ignorando): {e}")
+            # Só logar erros sérios durante destruição
+            if "access violation" in str(e).lower() or "segmentation" in str(e).lower():
+                print(f"[DEBUG] Erro sério durante destruição: {e}")
         finally:
             # Sempre limpar as referências
             self._core = None
